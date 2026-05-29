@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NutriSetu — Your Personal Health Companion</title>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,500;0,700;1,500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="css/style.css">
+    <noscript>
+        <style>body{font-family:sans-serif;padding:2rem;text-align:center}</style>
+        <p>NutriSetu requires JavaScript. Please enable it in your browser.</p>
+    </noscript>
+</head>
+<body>
+
+    <div class="bg-orb orb-1"></div>
+    <div class="bg-orb orb-2"></div>
+    <div class="bg-orb orb-3"></div>
+    <div class="grain"></div>
+
+    <!-- NAV -->
+    <nav id="main-nav" class="navbar hidden">
+        <div class="nav-brand">
+            <svg class="brand-leaf" viewBox="0 0 32 32" fill="none"><path d="M6 26C6 26 8 14 20 8C20 8 22 18 12 24" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M12 24C12 24 14 18 20 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" opacity="0.5"/></svg>
+            NutriSetu
+        </div>
+        <ul class="nav-links">
+            <li><a href="#" data-target="dashboard-section" class="nav-link active">
+                <svg viewBox="0 0 20 20" fill="none"><rect x="2" y="2" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.5"/><rect x="11" y="2" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.5"/><rect x="2" y="11" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.5"/><rect x="11" y="11" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.5"/></svg>
+                Dashboard
+            </a></li>
+            <li><a href="#" data-target="food-log-section" class="nav-link">
+                <svg viewBox="0 0 20 20" fill="none"><path d="M10 2v16M6 6c0-2 2-4 4-4s4 2 4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M4 10h12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                Food Log
+            </a></li>
+            <li><a href="#" data-target="progress-section" class="nav-link">
+                <svg viewBox="0 0 20 20" fill="none"><path d="M2 14l4-4 4 2 4-6 4 2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                Progress
+            </a></li>
+            <li><a href="#" data-target="recipes-section" class="nav-link">
+                <svg viewBox="0 0 20 20" fill="none"><path d="M7 3c0 3-3 4-3 7a6 6 0 0012 0c0-3-3-4-3-7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M10 18v-5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                Recipes
+            </a></li>
+        </ul>
+        <div class="nav-actions">
+            <button id="logout-btn" class="logout-btn" onclick="handleLogout()"> Logout</button>
+            <button id="reset-onboarding" class="reset-btn">↺ Reset Data</button>
+        </div>
+        <button class="hamburger" id="hamburger" aria-label="Menu"><span></span><span></span><span></span></button>
+    </nav>
+
+    <main id="app-container">
+
+        <!-- 
+             AUTH SECTION [NEW]
+         -->
+        <section id="auth-section" class="page-section active">
+            <div class="auth-layout">
+                <div class="auth-card">
+                    <div class="auth-brand">
+                        <svg class="brand-leaf" viewBox="0 0 32 32" fill="none"><path d="M6 26C6 26 8 14 20 8C20 8 22 18 12 24" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M12 24C12 24 14 18 20 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" opacity="0.5"/></svg>
+                        NutriSetu
+                    </div>
+                    <h2>Welcome to NutriSetu</h2>
+                    <p class="auth-sub">Your personal budget-aware health companion</p>
+                    
+                    <div class="auth-tabs">
+                        <button id="tab-login" class="authtab active" onclick="switchAuthTab('login')">Login</button>
+                        <button id="tab-signup" class="authtab" onclick="switchAuthTab('signup')">Sign Up</button>
+                    </div>
+
+                    <!-- Login Form -->
+                    <div id="login-form-wrap" class="auth-form-wrap">
+                        <div class="field-group">
+                            <label for="login-email">Email Address</label>
+                            <input type="email" id="login-email" placeholder="you@example.com">
+                        </div>
+                        <div class="field-group">
+                            <label for="login-password">Password</label>
+                            <input type="password" id="login-password" placeholder="••••••••">
+                        </div>
+                        <button class="btn-primary full" onclick="submitLogin()">Login </button>
+                    </div>
+
+                    <!-- Signup Form -->
+                    <div id="signup-form-wrap" class="auth-form-wrap hidden">
+                        <div class="field-group">
+                            <label for="signup-name">Full Name</label>
+                            <input type="text" id="signup-name" placeholder="Arjun Sharma">
+                        </div>
+                        <div class="field-group">
+                            <label for="signup-email">Email Address</label>
+                            <input type="email" id="signup-email" placeholder="you@example.com">
+                        </div>
+                        <div class="field-group">
+                            <label for="signup-password">Password</label>
+                            <input type="password" id="signup-password" placeholder="Choose a secure password">
+                        </div>
+                        <button class="btn-primary full" onclick="submitSignupNext()">Start Onboarding </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 
+             ONBOARDING — 4 steps
+         -->
+        <section id="onboarding-section" class="page-section hidden">
+            <div class="ob-layout">
+
+                <!-- Left hero panel -->
+                <div class="ob-panel-left">
+                    <div class="ob-hero-text">
+                        <div class="ob-tagline">Your journey to</div>
+                        <h1>NutriSetu:<br>Better <em>Health</em><br>Starts Here</h1>
+                        <p>Personalized nutrition plans built around your body, goals, and dietary preferences.</p>
+                    </div>
+                    <div class="ob-features">
+                        <div class="ob-feat"><span class="feat-dot"></span>Diet-type aware meal recommendations</div>
+                        <div class="ob-feat"><span class="feat-dot"></span>Mifflin-St Jeor TDEE calculation</div>
+                        <div class="ob-feat"><span class="feat-dot"></span>Daily calorie &amp; macro tracking</div>
+                        <div class="ob-feat"><span class="feat-dot"></span>AI-powered recipe generation</div>
+                    </div>
+                </div>
+
+                <!-- Right: wizard card -->
+                <div class="ob-panel-right">
+                    <div class="ob-card">
+
+                        <!-- Step dots -->
+                        <div class="step-dots">
+                            <span class="sdot active"></span>
+                            <span class="sdot"></span>
+                            <span class="sdot"></span>
+                            <span class="sdot"></span>
+                        </div>
+
+                        <!--  Step 1: Personal Details  -->
+                        <div class="wizard-step active" id="step-1">
+                            <div class="step-label">Step 1 of 4</div>
+                            <h2>Tell us about yourself</h2>
+                            <p class="step-sub">We'll use this to tailor your plan precisely.</p>
+                            <div class="field-group"><label for="ob-name">Full Name</label><input type="text" id="ob-name" placeholder="E.g., Arjun Sharma"></div>
+                            <div class="field-row">
+                                <div class="field-group"><label for="ob-age">Age</label><input type="number" id="ob-age" placeholder="25" min="1" max="130"></div>
+                                <div class="field-group"><label for="ob-gender">Gender</label><select id="ob-gender"><option value="male">Male</option><option value="female">Female</option></select></div>
+                            </div>
+                            <div class="field-row">
+                                <div class="field-group"><label for="ob-height">Height (cm)</label><input type="number" id="ob-height" placeholder="175" min="50" max="300"></div>
+                                <div class="field-group"><label for="ob-weight">Weight (kg)</label><input type="number" id="ob-weight" placeholder="70" min="10" max="500"></div>
+                            </div>
+                            <div class="field-group"><label for="ob-target">Target Weight (kg)</label><input type="number" id="ob-target" placeholder="65" min="10" max="500"></div>
+                            <button class="btn-primary full" onclick="nextStep(2)">Continue →</button>
+                        </div>
+
+                        <!--  Step 2: Diet Type  -->
+                        <div class="wizard-step" id="step-2">
+                            <div class="step-label">Step 2 of 4</div>
+                            <h2>Your Diet Preference</h2>
+                            <p class="step-sub">This filters every meal suggestion, food log, and recipe to match what you eat.</p>
+
+                            <div class="diet-grid">
+                                <label class="diet-card">
+                                    <input type="radio" name="dietType" value="veg" checked>
+                                    <div class="diet-inner">
+                                        <span class="diet-icon"></span>
+                                        <strong>Vegetarian</strong>
+                                        <small>No meat or fish, but includes dairy &amp; eggs</small>
+                                        <span class="diet-badge badge-veg">VEG</span>
+                                    </div>
+                                </label>
+                                <label class="diet-card">
+                                    <input type="radio" name="dietType" value="vegan">
+                                    <div class="diet-inner">
+                                        <span class="diet-icon"></span>
+                                        <strong>Vegan</strong>
+                                        <small>100% plant-based, no animal products</small>
+                                        <span class="diet-badge badge-vegan">VEGAN</span>
+                                    </div>
+                                </label>
+                                <label class="diet-card">
+                                    <input type="radio" name="dietType" value="nonveg">
+                                    <div class="diet-inner">
+                                        <span class="diet-icon"></span>
+                                        <strong>Non-Vegetarian</strong>
+                                        <small>All foods including meat, fish &amp; eggs</small>
+                                        <span class="diet-badge badge-non-veg">NON-VEG</span>
+                                    </div>
+                                </label>
+                            </div>
+
+                            <div class="diet-note">
+                                <svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="7" stroke="currentColor" stroke-width="1.5"/><path d="M8 7v5M8 5v.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                                You can change your diet preference later from the dashboard settings.
+                            </div>
+
+                            <div class="btn-row">
+                                <button class="btn-ghost" onclick="nextStep(1)">← Back</button>
+                                <button class="btn-primary" onclick="nextStep(3)">Continue →</button>
+                            </div>
+                        </div>
+
+                        <!--  Step 3: Activity Level  -->
+                        <div class="wizard-step" id="step-3">
+                            <div class="step-label">Step 3 of 4</div>
+                            <h2>Activity Level</h2>
+                            <p class="step-sub">How would you describe your daily movement?</p>
+                            <div class="activity-grid">
+                                <label class="act-card"><input type="radio" name="activity" value="sedentary" checked><div class="act-inner"><span class="act-icon"></span><strong>Sedentary</strong><small>Desk job, little movement</small></div></label>
+                                <label class="act-card"><input type="radio" name="activity" value="lightly"><div class="act-inner"><span class="act-icon"></span><strong>Lightly Active</strong><small>1–2 days/week</small></div></label>
+                                <label class="act-card"><input type="radio" name="activity" value="moderately"><div class="act-inner"><span class="act-icon"></span><strong>Moderate</strong><small>2-4 days/week</small></div></label>
+                                <label class="act-card"><input type="radio" name="activity" value="very"><div class="act-inner"><span class="act-icon"></span><strong>Very Active</strong><small>4-6 days hard</small></div></label>
+                                <label class="act-card"><input type="radio" name="activity" value="extra"><div class="act-inner"><span class="act-icon"></span><strong>Extra Active</strong><small>Physical job + training</small></div></label>
+                            </div>
+                            <div class="btn-row"><button class="btn-ghost" onclick="nextStep(2)">← Back</button><button class="btn-primary" onclick="nextStep(4)">Continue →</button></div>
+                        </div>
+
+                        <!--  Step 4: Health Goal  -->
+                        <div class="wizard-step" id="step-4">
+                            <div class="step-label">Step 4 of 4</div>
+                            <h2>Your Main Goal</h2>
+                            <p class="step-sub">What are you working towards?</p>
+                            <div class="goal-grid">
+                                <label class="goal-card"><input type="radio" name="goal" value="loss"><div class="goal-inner"><span class="goal-icon"></span><strong>Lose Weight</strong><small>500 kcal daily deficit</small></div></label>
+                                <label class="goal-card"><input type="radio" name="goal" value="maintenance" checked><div class="goal-inner"><span class="goal-icon"></span><strong>Maintain</strong><small>Stay at current weight</small></div></label>
+                                <label class="goal-card"><input type="radio" name="goal" value="gain"><div class="goal-inner"><span class="goal-icon"></span><strong>Gain Weight</strong><small>500 kcal daily surplus</small></div></label>
+                            </div>
+                            <div class="btn-row"><button class="btn-ghost" onclick="nextStep(3)">← Back</button><button class="btn-primary" onclick="calculatePlan()">Calculate My Plan</button></div>
+                        </div>
+
+                        <!--  Step 5: Results  -->
+                        <div class="wizard-step" id="step-5">
+                            <div class="step-label">Your Plan is Ready </div>
+                            <h2>Personalized Plan Details</h2>
+                            <div class="result-hero">
+                                <div class="result-cal-ring"><span id="res-calories">0</span><small>kcal/day</small></div>
+                                <p class="result-note">Based on Mifflin-St Jeor equation</p>
+                                <div id="result-diet-badge" class="result-diet-badge"></div>
+                            </div>
+                            <div class="meal-split-grid">
+                                <div class="msplit"><span class="msplit-label"> Breakfast</span><span class="msplit-pct">25%</span><span class="msplit-cal" id="split-bk">0 kcal</span></div>
+                                <div class="msplit"><span class="msplit-label"> Lunch</span><span class="msplit-pct">35%</span><span class="msplit-cal" id="split-lu">0 kcal</span></div>
+                                <div class="msplit"><span class="msplit-label"> Dinner</span><span class="msplit-pct">30%</span><span class="msplit-cal" id="split-di">0 kcal</span></div>
+                                <div class="msplit"><span class="msplit-label"> Snacks</span><span class="msplit-pct">10%</span><span class="msplit-cal" id="split-sn">0 kcal</span></div>
+                            </div>
+                            
+                            <div class="field-group budget-onboard-group">
+                                <label for="ob-budget">Set Daily Food Budget (₹)</label>
+                                <input type="number" id="ob-budget" value="300" min="100" max="1000">
+                            </div>
+                            <button class="btn-primary full" onclick="finishOnboarding()">Register Profile →</button>
+                        </div>
+
+                    </div><!-- /ob-card -->
+                </div><!-- /ob-panel-right -->
+            </div><!-- /ob-layout -->
+        </section>
+
+        <!-- 
+             DASHBOARD
+         -->
+        <section id="dashboard-section" class="page-section hidden">
+            <div class="page-wrap">
+                <div class="page-header">
+                    <div><p class="page-eyebrow">Good day</p><h2 class="page-title" id="dash-greeting">Your Dashboard</h2></div>
+                    <div class="page-header-right">
+                        <!-- Diet type badge + change button -->
+                        <div id="diet-badge-wrap" class="diet-badge-wrap"></div>
+                        <div class="page-date" id="today-date"></div>
+                    </div>
+                </div>
+
+                <div class="dash-grid">
+                    <div class="card card-calorie">
+                        <div class="card-label">Daily Calories</div>
+                        <div class="donut-wrap">
+                            <canvas id="calorieDonutChart" width="180" height="180"></canvas>
+                            <div class="donut-center"><span id="dash-remaining" class="donut-num">0</span><small>remaining</small></div>
+                        </div>
+                        <div class="cal-legend">
+                            <div class="leg-item"><span class="leg-dot consumed"></span>Consumed: <strong id="dash-consumed">0</strong></div>
+                            <div class="leg-item"><span class="leg-dot target"></span>Target: <strong id="dash-target-lbl">0</strong></div>
+                        </div>
+                    </div>
+
+                    <!-- Spending & Budget Slider Card [NEW] -->
+                    <div class="card card-spending">
+                        <div class="card-label">Daily Spending Tracker</div>
+                        <div class="donut-wrap">
+                            <canvas id="budgetBurnChart" width="180" height="180"></canvas>
+                            <div class="donut-center">
+                                <span id="dash-spent" class="donut-num">₹0</span>
+                                <small>spent of <span id="dash-budget-lbl">₹300</span></small>
+                            </div>
+                        </div>
+                        <div class="budget-slider-group">
+                            <div class="budget-slider-label">
+                                <span>Adjust Daily Target:</span>
+                                <strong>₹<span id="slider-val">300</span></strong>
+                            </div>
+                            <input type="range" id="dash-budget-slider" min="100" max="1000" step="50" value="300" oninput="updateBudgetSliderVal(this.value)" onchange="saveBudgetSliderVal(this.value)">
+                        </div>
+                    </div>
+
+                    <div class="card card-profile">
+                        <div class="card-label">Profile</div>
+                        <div class="profile-rows">
+                            <div class="prof-row"><span>Name</span><strong id="sum-name">—</strong></div>
+                            <div class="prof-row"><span>Current Weight</span><strong><span id="sum-weight">—</span> kg</strong></div>
+                            <div class="prof-row"><span>Target Weight</span><strong><span id="sum-target">—</span> kg</strong></div>
+                            <div class="prof-row"><span>Goal</span><strong id="sum-goal">—</strong></div>
+                            <div class="prof-row"><span>Diet Type</span><strong id="sum-diet">—</strong></div>
+                            <div class="prof-row"><span>BMI</span><strong id="sum-bmi">—</strong></div>
+                        </div>
+                    </div>
+
+                    <!-- Optimized Meal Plan with special mode selector -->
+                    <div class="card card-meals span-2">
+                        <div class="meals-header-wrap">
+                            <div class="card-label">Today's Optimized Recommendations 
+                                <span id="meal-diet-label" class="meal-diet-label"></span>
+                            </div>
+                            
+                            <!-- Optimization Mode Toggles [NEW] -->
+                            <div class="opt-mode-tabs">
+                                <button id="opt-mode-normal" class="opt-tab active" onclick="changeOptMode('normal')"> Balanced</button>
+                                <button id="opt-mode-student" class="opt-tab" onclick="changeOptMode('student')"> Student Mode</button>
+                                <button id="opt-mode-challenge" class="opt-tab" onclick="changeOptMode('budget_challenge')"> ₹100 Challenge</button>
+                            </div>
+                        </div>
+
+                        <div class="meal-tabs">
+                            <button class="mtab active" data-meal="bk"> Breakfast</button>
+                            <button class="mtab" data-meal="lu"> Lunch</button>
+                            <button class="mtab" data-meal="di"> Dinner</button>
+                            <button class="mtab" data-meal="sn"> Snacks</button>
+                        </div>
+                        <div class="meal-tab-content">
+                            <div class="mtab-panel active" id="panel-bk"><p class="meal-allowance"><span id="meal-cal-bk">0</span> kcal allowance</p><div id="rec-bk" class="rec-list">Loading…</div></div>
+                            <div class="mtab-panel" id="panel-lu"><p class="meal-allowance"><span id="meal-cal-lu">0</span> kcal allowance</p><div id="rec-lu" class="rec-list">Loading…</div></div>
+                            <div class="mtab-panel" id="panel-di"><p class="meal-allowance"><span id="meal-cal-di">0</span> kcal allowance</p><div id="rec-di" class="rec-list">Loading…</div></div>
+                            <div class="mtab-panel" id="panel-sn"><p class="meal-allowance"><span id="meal-cal-sn">0</span> kcal allowance</p><div id="rec-sn" class="rec-list">Loading…</div></div>
+                        </div>
+                    </div>
+
+                    <div class="card card-stats">
+                        <div class="card-label">Quick Stats</div>
+                        <div class="qs-grid">
+                            <div class="qs-item"><span class="qs-val" id="stat-bmi">—</span><span class="qs-key">BMI</span></div>
+                            <div class="qs-item"><span class="qs-val" id="stat-days-active">1</span><span class="qs-key">Day</span></div>
+                            <div class="qs-item"><span class="qs-val" id="stat-logs-today">0</span><span class="qs-key">Logged</span></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 
+             FOOD LOG
+         -->
+        <section id="food-log-section" class="page-section hidden">
+            <div class="page-wrap">
+                <div class="page-header">
+                    <div><p class="page-eyebrow">Track every bite</p><h2 class="page-title">Food Log</h2></div>
+                    <div class="log-total-badge"><span id="log-total-cal">0</span> kcal today</div>
+                </div>
+                <div class="log-layout">
+                    <div class="card log-add-card">
+                        <div class="log-add-header">
+                            <h3>Add Food</h3>
+                            <!-- Shows current diet filter actively applied -->
+                            <span id="log-diet-filter-badge" class="log-diet-badge"></span>
+                        </div>
+                        <div id="add-food-form">
+                            <div class="field-group"><label for="log-food-select">Search Foods</label><select id="log-food-select"></select></div>
+                            <div class="field-group">
+                                <label for="log-portions">Portions</label>
+                                <div class="portion-control">
+                                    <button type="button" class="portion-btn" onclick="adjustPortion(-0.5)">−</button>
+                                    <input type="number" id="log-portions" value="1" min="0.5" step="0.5">
+                                    <button type="button" class="portion-btn" onclick="adjustPortion(0.5)">+</button>
+                                </div>
+                            </div>
+                            <div id="food-preview" class="food-preview hidden"></div>
+                            <button type="button" class="btn-primary full" onclick="logFood()">Log Food</button>
+                        </div>
+                    </div>
+                    <div class="card log-list-card">
+                        <h3>Today's Entries</h3>
+                        <ul class="log-entries" id="food-log-ul"><li class="log-empty">No food logged yet today.</li></ul>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 
+             PROGRESS
+         -->
+        <section id="progress-section" class="page-section hidden">
+            <div class="page-wrap">
+                <div class="page-header"><div><p class="page-eyebrow">Your journey</p><h2 class="page-title">Progress &amp; Analytics</h2></div></div>
+                <div class="progress-grid">
+                    <div class="card chart-card span-2"><div class="card-label">Calorie Intake — Last 7 Days</div><canvas id="calorieBarChart" height="120"></canvas></div>
+                    
+                    <!-- Spent vs Target Budget Trend Chart [NEW] -->
+                    <div class="card chart-card span-2"><div class="card-label">Spending vs Calories Trend — Last 7 Days</div><canvas id="spendingTrendChart" height="120"></canvas></div>
+                    
+                    <!-- Nutritional ROI Chart [NEW] -->
+                    <div class="card chart-card span-2"><div class="card-label">Nutritional ROI — Protein per Rupee (g/₹)</div><canvas id="roiBarChart" height="120"></canvas></div>
+                    
+                    <div class="card chart-card span-2"><div class="card-label">Weight Trend — Last 30 Days</div><canvas id="weightLineChart" height="120"></canvas></div>
+                    
+                    <div class="card goal-card">
+                        <div class="card-label">Goal Progress</div>
+                        <div class="svg-ring-wrap">
+                            <svg viewBox="0 0 36 36" class="ring-svg">
+                                <path class="ring-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"/>
+                                <path class="ring-fill" id="goal-progress-path" stroke-dasharray="0, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"/>
+                                <text x="18" y="20.35" class="ring-pct" id="goal-percent-text">0%</text>
+                            </svg>
+                        </div>
+                        <p id="goal-eta-text" class="eta-text">Keep logging to see ETA</p>
+                    </div>
+                    <div class="card stats-card">
+                        <div class="card-label">Body Stats</div>
+                        <div class="body-stats">
+                            <div class="bstat"><span class="bstat-val" id="bstat-bmi">—</span><span class="bstat-key">BMI</span></div>
+                            <div class="bstat"><span class="bstat-val" id="bstat-days">1</span><span class="bstat-key">Days Active</span></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 
+             RECIPES
+         -->
+        <section id="recipes-section" class="page-section hidden">
+            <div class="page-wrap">
+                <div class="page-header">
+                    <div><p class="page-eyebrow">Cook smarter</p><h2 class="page-title">Recipe Generator</h2></div>
+                </div>
+                <div class="card recipe-input-card">
+                    <p>Enter what you have and we'll suggest recipes matching your diet preference.</p>
+                    <div class="recipe-input-row">
+                        <div class="field-group flex-1"><label for="recipe-ingredients">Ingredients (comma separated)</label><input type="text" id="recipe-ingredients" placeholder="E.g., eggs, tomato, onion, spinach"></div>
+                        <button class="btn-primary" onclick="generateRecipe()">Generate </button>
+                    </div>
+                    <div id="recipe-diet-filter" class="recipe-diet-filter">
+                        <span>Showing:</span>
+                        <button class="rdiet-btn active" data-filter="all">All</button>
+                        <button class="rdiet-btn" data-filter="veg"> Veg</button>
+                        <button class="rdiet-btn" data-filter="vegan"> Vegan</button>
+                        <button class="rdiet-btn" data-filter="nonveg"> Non-Veg</button>
+                    </div>
+                </div>
+                <div id="recipe-results" class="recipe-results"></div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- CHATBOT -->
+    <div id="chatbot-container">
+        <button id="chatbot-toggle" class="chat-fab" aria-label="Open NutriBot">
+            <svg viewBox="0 0 24 24" fill="none"><path d="M12 2C6.48 2 2 6.48 2 12c0 1.85.5 3.58 1.37 5.07L2 22l4.93-1.37A9.95 9.95 0 0012 22c5.52 0 10-4.48 10-10S17.52 2 12 2z" stroke="currentColor" stroke-width="1.5"/><path d="M8 12h.01M12 12h.01M16 12h.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        </button>
+        <div id="chat-panel" class="chat-panel hidden">
+            <div class="chat-header">
+                <div class="chat-brand"><span class="chat-avatar"></span><div><strong>NutriBot</strong><small>AI Health Assistant</small></div></div>
+                <button id="chat-close" aria-label="Close">×</button>
+            </div>
+            <div class="chat-body" id="chat-body">
+                <div class="msg bot-msg">Hi! I'm NutriBot  Ask me anything about nutrition, calories, or healthy habits!</div>
+                <div class="quick-chips">
+                    <button class="chip" onclick="sendChat('How many calories in an egg?')">Calories in an egg?</button>
+                    <button class="chip" onclick="sendChat('Suggest a healthy lunch.')">Healthy lunch?</button>
+                    <button class="chip" onclick="sendChat('Give me hydration tips.')">Hydration tips?</button>
+                </div>
+            </div>
+            <div class="typing-indicator hidden" id="typing-indicator"><span></span><span></span><span></span></div>
+            <div class="chat-footer">
+                <input type="text" id="chat-input" placeholder="Ask NutriBot…" autocomplete="off">
+                <button class="send-btn" onclick="handleChatSubmit()">
+                    <svg viewBox="0 0 20 20" fill="currentColor"><path d="M3 10l14-7-5 7 5 7z"/></svg>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Diet Change Modal -->
+    <div id="diet-modal" class="modal-overlay hidden">
+        <div class="modal-card">
+            <h3>Change Diet Preference</h3>
+            <p>Your meal recommendations, food log, and recipes will update immediately.</p>
+            <div class="diet-grid modal-diet-grid">
+                <label class="diet-card"><input type="radio" name="dietTypeModal" value="veg"><div class="diet-inner"><span class="diet-icon">🥦</span><strong>Vegetarian</strong><small>Dairy &amp; eggs included</small><span class="diet-badge badge-veg">VEG</span></div></label>
+                <label class="diet-card"><input type="radio" name="dietTypeModal" value="vegan"><div class="diet-inner"><span class="diet-icon"></span><strong>Vegan</strong><small>100% plant-based</small><span class="diet-badge badge-vegan">VEGAN</span></div></label>
+                <label class="diet-card"><input type="radio" name="dietTypeModal" value="nonveg"><div class="diet-inner"><span class="diet-icon"></span><strong>Non-Veg</strong><small>All foods allowed</small><span class="diet-badge badge-non-veg">NON-VEG</span></div></label>
+            </div>
+            <div class="modal-actions">
+                <button class="btn-ghost" onclick="closeDietModal()">Cancel</button>
+                <button class="btn-primary" onclick="saveDietChange()">Save Preference</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="toast-container"></div>
+    <script src="js/app.js"></script>
+</body>
+</html>
