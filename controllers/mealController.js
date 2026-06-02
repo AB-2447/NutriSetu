@@ -1,6 +1,7 @@
 const Food = require('../models/Food');
 const costCalculator = require('../services/costCalculator');
-const mealOptimizer = require('../services/mealOptimizer');
+const MealOptimizer = require('../services/mealOptimizer');
+const mealOptimizer = new MealOptimizer();
 
 exports.getFoodCost = async (req, res) => {
     try {

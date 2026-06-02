@@ -146,7 +146,7 @@ async function testLogFood() {
                 foodId: paneerFood._id,
                 foodName: paneerFood.name,
                 calories: paneerFood.calories,
-                portions: 1.5,
+                portions: 2,
                 type: paneerFood.type
             })
         });
@@ -154,7 +154,7 @@ async function testLogFood() {
         assert(res.status === 201, `Status should be 201, got ${res.status}`);
         const body = await res.json();
         assert(body.foodName === paneerFood.name, 'Logged food name should match');
-        assert(body.portions === 1.5, 'Portions should match');
+        assert(body.portions === 2, 'Portions should match');
         assert(body.cost > 0, `Dynamic cost calculation works: ₹${body.cost}`);
     } catch (err) {
         console.error('Log food test failed:', err.message);

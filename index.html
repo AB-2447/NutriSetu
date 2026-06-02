@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>NutriSetu — Your Personal Health Companion</title>
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,500;0,700;1,500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link rel="stylesheet" href="css/style.css">
@@ -164,7 +165,7 @@
                                 <label class="diet-card">
                                     <input type="radio" name="dietType" value="veg" checked>
                                     <div class="diet-inner">
-                                        <span class="diet-icon"></span>
+                                        <span class="diet-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:36px;height:36px;color:#2D7A4A;"><path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 2 2 4a7 7 0 0 1-10 14z"/><path d="M19 2c-2.26 4.33-5.27 7.14-8 10"/></svg></span>
                                         <strong>Vegetarian</strong>
                                         <small>No meat or fish, but includes dairy &amp; eggs</small>
                                         <span class="diet-badge badge-veg">VEG</span>
@@ -173,7 +174,7 @@
                                 <label class="diet-card">
                                     <input type="radio" name="dietType" value="vegan">
                                     <div class="diet-inner">
-                                        <span class="diet-icon"></span>
+                                        <span class="diet-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:36px;height:36px;color:#388E3C;"><path d="M12 2a10 10 0 0 1 10 10c0 5.523-4.477 10-10 10S2 17.523 2 12 6.477 2 12 2zm0 5a5 5 0 0 0-5 5h10a5 5 0 0 0-5-5z"/></svg></span>
                                         <strong>Vegan</strong>
                                         <small>100% plant-based, no animal products</small>
                                         <span class="diet-badge badge-vegan">VEGAN</span>
@@ -182,7 +183,7 @@
                                 <label class="diet-card">
                                     <input type="radio" name="dietType" value="nonveg">
                                     <div class="diet-inner">
-                                        <span class="diet-icon"></span>
+                                        <span class="diet-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:36px;height:36px;color:#B33A2A;"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></span>
                                         <strong>Non-Vegetarian</strong>
                                         <small>All foods including meat, fish &amp; eggs</small>
                                         <span class="diet-badge badge-non-veg">NON-VEG</span>
@@ -207,11 +208,11 @@
                             <h2>Activity Level</h2>
                             <p class="step-sub">How would you describe your daily movement?</p>
                             <div class="activity-grid">
-                                <label class="act-card"><input type="radio" name="activity" value="sedentary" checked><div class="act-inner"><span class="act-icon"></span><strong>Sedentary</strong><small>Desk job, little movement</small></div></label>
-                                <label class="act-card"><input type="radio" name="activity" value="lightly"><div class="act-inner"><span class="act-icon"></span><strong>Lightly Active</strong><small>1–2 days/week</small></div></label>
-                                <label class="act-card"><input type="radio" name="activity" value="moderately"><div class="act-inner"><span class="act-icon"></span><strong>Moderate</strong><small>2-4 days/week</small></div></label>
-                                <label class="act-card"><input type="radio" name="activity" value="very"><div class="act-inner"><span class="act-icon"></span><strong>Very Active</strong><small>4-6 days hard</small></div></label>
-                                <label class="act-card"><input type="radio" name="activity" value="extra"><div class="act-inner"><span class="act-icon"></span><strong>Extra Active</strong><small>Physical job + training</small></div></label>
+                                <label class="act-card"><input type="radio" name="activity" value="sedentary" checked><div class="act-inner"><span class="act-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:28px;height:28px;color:var(--text-muted);"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span><strong>Sedentary</strong><small>Desk job, little movement</small></div></label>
+                                <label class="act-card"><input type="radio" name="activity" value="lightly"><div class="act-inner"><span class="act-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:28px;height:28px;color:var(--green-light);"><path d="M18 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M16 11l2 2 4-4"/></svg></span><strong>Lightly Active</strong><small>1–2 days/week</small></div></label>
+                                <label class="act-card"><input type="radio" name="activity" value="moderately"><div class="act-inner"><span class="act-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:28px;height:28px;color:var(--amber);"><path d="M18 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M17 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span><strong>Moderate</strong><small>2-4 days/week</small></div></label>
+                                <label class="act-card"><input type="radio" name="activity" value="very"><div class="act-inner"><span class="act-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:28px;height:28px;color:var(--rust);"><path d="M6 18H2v-3h4v3zm16-3h-4v3h4v-3zM12 3a9 9 0 0 0-9 9v1h18v-1a9 9 0 0 0-9-9z"/></svg></span><strong>Very Active</strong><small>4-6 days hard</small></div></label>
+                                <label class="act-card"><input type="radio" name="activity" value="extra"><div class="act-inner"><span class="act-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:28px;height:28px;color:var(--amber);"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6M18 9h1.5a2.5 2.5 0 0 0 0-5H18M4 22h16M10 14.66V17c0 .55-.45 1-1 1H4v2h16v-2h-5c-.55 0-1-.45-1-1v-2.34M12 2a4 4 0 0 0-4 4v5c0 .55.45 1 1 1h6c.55 0 1-.45 1-1v-5a4 4 0 0 0-4-4z"/></svg></span><strong>Extra Active</strong><small>Physical job + training</small></div></label>
                             </div>
                             <div class="btn-row"><button class="btn-ghost" onclick="nextStep(2)">← Back</button><button class="btn-primary" onclick="nextStep(4)">Continue →</button></div>
                         </div>
@@ -222,9 +223,9 @@
                             <h2>Your Main Goal</h2>
                             <p class="step-sub">What are you working towards?</p>
                             <div class="goal-grid">
-                                <label class="goal-card"><input type="radio" name="goal" value="loss"><div class="goal-inner"><span class="goal-icon"></span><strong>Lose Weight</strong><small>500 kcal daily deficit</small></div></label>
-                                <label class="goal-card"><input type="radio" name="goal" value="maintenance" checked><div class="goal-inner"><span class="goal-icon"></span><strong>Maintain</strong><small>Stay at current weight</small></div></label>
-                                <label class="goal-card"><input type="radio" name="goal" value="gain"><div class="goal-inner"><span class="goal-icon"></span><strong>Gain Weight</strong><small>500 kcal daily surplus</small></div></label>
+                                <label class="goal-card"><input type="radio" name="goal" value="loss"><div class="goal-inner"><span class="goal-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:32px;height:32px;color:var(--rust);"><path d="M22 17l-6-6-4 4-8-8"/><path d="M16 17h6v-6"/></svg></span><strong>Lose Weight</strong><small>500 kcal daily deficit</small></div></label>
+                                <label class="goal-card"><input type="radio" name="goal" value="maintenance" checked><div class="goal-inner"><span class="goal-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:32px;height:32px;color:var(--green-light);"><path d="M16 16v1a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h11a2 2 0 0 1 2 2v1"/><path d="M18 8h4a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-4"/></svg></span><strong>Maintain</strong><small>Stay at current weight</small></div></label>
+                                <label class="goal-card"><input type="radio" name="goal" value="gain"><div class="goal-inner"><span class="goal-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:32px;height:32px;color:var(--green-deep);"><path d="M22 7l-6 6-4-4-8 8"/><path d="M22 13V7h-6"/></svg></span><strong>Gain Weight</strong><small>500 kcal daily surplus</small></div></label>
                             </div>
                             <div class="btn-row"><button class="btn-ghost" onclick="nextStep(3)">← Back</button><button class="btn-primary" onclick="calculatePlan()">Calculate My Plan</button></div>
                         </div>
@@ -273,7 +274,10 @@
 
                 <div class="dash-grid">
                     <div class="card card-calorie">
-                        <div class="card-label">Daily Calories</div>
+                        <div class="card-label">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:14px;height:14px;display:inline-block;vertical-align:middle;margin-right:4px;color:var(--rust);"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg>
+                            Daily Calories
+                        </div>
                         <div class="donut-wrap">
                             <canvas id="calorieDonutChart" width="180" height="180"></canvas>
                             <div class="donut-center"><span id="dash-remaining" class="donut-num">0</span><small>remaining</small></div>
@@ -286,7 +290,10 @@
 
                     <!-- Spending & Budget Slider Card [NEW] -->
                     <div class="card card-spending">
-                        <div class="card-label">Daily Spending Tracker</div>
+                        <div class="card-label">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:14px;height:14px;display:inline-block;vertical-align:middle;margin-right:4px;color:var(--green-light);"><circle cx="12" cy="12" r="10"/><path d="M12 6v12M15 9H10.5a2.5 2.5 0 0 0 0 5h3a2.5 2.5 0 0 1 0 5H9"/></svg>
+                            Daily Spending Tracker
+                        </div>
                         <div class="donut-wrap">
                             <canvas id="budgetBurnChart" width="180" height="180"></canvas>
                             <div class="donut-center">
@@ -299,12 +306,15 @@
                                 <span>Adjust Daily Target:</span>
                                 <strong>₹<span id="slider-val">300</span></strong>
                             </div>
-                            <input type="range" id="dash-budget-slider" min="100" max="1000" step="50" value="300" oninput="updateBudgetSliderVal(this.value)" onchange="saveBudgetSliderVal(this.value)">
+                            <input type="range" id="dash-budget-slider" min="100" max="1000" step="50" value="300" oninput="updateBudgetSliderVal(this.value)">
                         </div>
                     </div>
 
                     <div class="card card-profile">
-                        <div class="card-label">Profile</div>
+                        <div class="card-label">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:14px;height:14px;display:inline-block;vertical-align:middle;margin-right:4px;color:var(--green-deep);"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                            Profile
+                        </div>
                         <div class="profile-rows">
                             <div class="prof-row"><span>Name</span><strong id="sum-name">—</strong></div>
                             <div class="prof-row"><span>Current Weight</span><strong><span id="sum-weight">—</span> kg</strong></div>
@@ -318,7 +328,9 @@
                     <!-- Optimized Meal Plan with special mode selector -->
                     <div class="card card-meals span-2">
                         <div class="meals-header-wrap">
-                            <div class="card-label">Today's Optimized Recommendations 
+                            <div class="card-label">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:14px;height:14px;display:inline-block;vertical-align:middle;margin-right:4px;color:var(--green-mid);"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                                Today's Optimized Recommendations 
                                 <span id="meal-diet-label" class="meal-diet-label"></span>
                             </div>
                             
@@ -345,7 +357,10 @@
                     </div>
 
                     <div class="card card-stats">
-                        <div class="card-label">Quick Stats</div>
+                        <div class="card-label">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:14px;height:14px;display:inline-block;vertical-align:middle;margin-right:4px;color:var(--amber);"><path d="M3 3v18h18M18.7 8l-5.1 5.2-2.8-2.7L7 14.3"/></svg>
+                            Quick Stats
+                        </div>
                         <div class="qs-grid">
                             <div class="qs-item"><span class="qs-val" id="stat-bmi">—</span><span class="qs-key">BMI</span></div>
                             <div class="qs-item"><span class="qs-val" id="stat-days-active">1</span><span class="qs-key">Day</span></div>
@@ -377,9 +392,9 @@
                             <div class="field-group">
                                 <label for="log-portions">Portions</label>
                                 <div class="portion-control">
-                                    <button type="button" class="portion-btn" onclick="adjustPortion(-0.5)">−</button>
-                                    <input type="number" id="log-portions" value="1" min="0.5" step="0.5">
-                                    <button type="button" class="portion-btn" onclick="adjustPortion(0.5)">+</button>
+                                    <button type="button" class="portion-btn" onclick="adjustPortion(-1)">−</button>
+                                    <input type="number" id="log-portions" value="1" min="1" step="1">
+                                    <button type="button" class="portion-btn" onclick="adjustPortion(1)">+</button>
                                 </div>
                             </div>
                             <div id="food-preview" class="food-preview hidden"></div>
@@ -468,7 +483,7 @@
         </button>
         <div id="chat-panel" class="chat-panel hidden">
             <div class="chat-header">
-                <div class="chat-brand"><span class="chat-avatar"></span><div><strong>NutriBot</strong><small>AI Health Assistant</small></div></div>
+                <div class="chat-brand"><span class="chat-avatar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:20px;height:20px;color:var(--white);vertical-align:middle;"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M12 2v2"/><path d="M12 4a3 3 0 0 0-3 3h6a3 3 0 0 0-3-3Z"/><path d="M7 15h.01"/><path d="M17 15h.01"/></svg></span><div><strong>NutriBot</strong><small>AI Health Assistant</small></div></div>
                 <button id="chat-close" aria-label="Close">×</button>
             </div>
             <div class="chat-body" id="chat-body">
@@ -495,9 +510,9 @@
             <h3>Change Diet Preference</h3>
             <p>Your meal recommendations, food log, and recipes will update immediately.</p>
             <div class="diet-grid modal-diet-grid">
-                <label class="diet-card"><input type="radio" name="dietTypeModal" value="veg"><div class="diet-inner"><span class="diet-icon">🥦</span><strong>Vegetarian</strong><small>Dairy &amp; eggs included</small><span class="diet-badge badge-veg">VEG</span></div></label>
-                <label class="diet-card"><input type="radio" name="dietTypeModal" value="vegan"><div class="diet-inner"><span class="diet-icon"></span><strong>Vegan</strong><small>100% plant-based</small><span class="diet-badge badge-vegan">VEGAN</span></div></label>
-                <label class="diet-card"><input type="radio" name="dietTypeModal" value="nonveg"><div class="diet-inner"><span class="diet-icon"></span><strong>Non-Veg</strong><small>All foods allowed</small><span class="diet-badge badge-non-veg">NON-VEG</span></div></label>
+                <label class="diet-card"><input type="radio" name="dietTypeModal" value="veg"><div class="diet-inner"><span class="diet-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:36px;height:36px;color:#2D7A4A;"><path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 2 2 4a7 7 0 0 1-10 14z"/><path d="M19 2c-2.26 4.33-5.27 7.14-8 10"/></svg></span><strong>Vegetarian</strong><small>Dairy &amp; eggs included</small><span class="diet-badge badge-veg">VEG</span></div></label>
+                <label class="diet-card"><input type="radio" name="dietTypeModal" value="vegan"><div class="diet-inner"><span class="diet-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:36px;height:36px;color:#388E3C;"><path d="M12 2a10 10 0 0 1 10 10c0 5.523-4.477 10-10 10S2 17.523 2 12 6.477 2 12 2zm0 5a5 5 0 0 0-5 5h10a5 5 0 0 0-5-5z"/></svg></span><strong>Vegan</strong><small>100% plant-based</small><span class="diet-badge badge-vegan">VEGAN</span></div></label>
+                <label class="diet-card"><input type="radio" name="dietTypeModal" value="nonveg"><div class="diet-inner"><span class="diet-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:36px;height:36px;color:#B33A2A;"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></span><strong>Non-Veg</strong><small>All foods allowed</small><span class="diet-badge badge-non-veg">NON-VEG</span></div></label>
             </div>
             <div class="modal-actions">
                 <button class="btn-ghost" onclick="closeDietModal()">Cancel</button>

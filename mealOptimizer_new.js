@@ -2,15 +2,8 @@ const Food = require('../models/Food');
 const costCalculator = require('./costCalculator');
 
 // ─────────────────────────────────────────────────────────────────────────────
-// CONSTANTS & CONFIGURATION
+// CONSTANTS
 // ─────────────────────────────────────────────────────────────────────────────
-
-const BUDGET_LEVELS = {
-    LOW: { min: 80, max: 150 },
-    MEDIUM: { min: 150, max: 300 },
-    HIGH: { min: 300, max: 600 },
-    PREMIUM: { min: 600, max: Infinity }
-};
 
 const INGREDIENT_SWAP_TABLE = {
     'paneer': {
@@ -22,50 +15,40 @@ const INGREDIENT_SWAP_TABLE = {
         replacement: 'Peanuts',
         savings: 40,
         reason: 'Peanuts offer similar healthy fats and protein at 1/5th the cost.'
-    },
-    'fish': {
-        replacement: 'Eggs',
-        savings: 30,
-        reason: 'Eggs are a highly bioavailable protein source at a fraction of fish prices.'
-    },
-    'tofu': {
-        replacement: 'Soy Chunks',
-        savings: 15,
-        reason: 'Soy chunks provide excellent vegan protein at lower retail costs.'
-    },
-    'chicken breast': {
-        replacement: 'Eggs',
-        savings: 20,
-        reason: 'Eggs provide complete proteins and are more budget-friendly than chicken breast.'
-    },
-    'chicken': {
-        replacement: 'Eggs',
-        savings: 15,
-        reason: 'Eggs are a cheap and highly nutritious animal protein alternative.'
     }
 };
 
 const CALORIE_TOLERANCE              = 0.20;
 const STUDENT_FRIENDLY_COST_PER_ITEM = 40;
+
+// Price history: keep last 30 snapshots per food (~1 month of daily runs)
 const MAX_PRICE_SNAPSHOTS = 30;
 
+// Spike thresholds: % rise above historical median baseline
 const SPIKE_THRESHOLDS = {
     warning:  0.10,  // +10%
     high:     0.25,  // +25%
     critical: 0.50   // +50%
 };
 
+// Substitute must score >= this to be accepted (0–1 composite)
 const MIN_SUBSTITUTE_SCORE = 0.50;
 
+// Budget pressure gap thresholds
 const PRESSURE_LEVELS = {
     ok:         0.00,
     tight:      0.15,
     stressed:   0.35
+    // anything above stressed → 'infeasible'
 };
 
+
 // ─────────────────────────────────────────────────────────────────────────────
-// PRICE HISTORY (In-memory cache tracker)
+// PRICE HISTORY
+// Stores rolling cost snapshots per food item (in-memory).
+// Swap `priceStore` read/write for a MongoDB collection or Redis in production.
 // ─────────────────────────────────────────────────────────────────────────────
+
 const priceStore = {};
 
 function recordPrice(foodId, cost) {
@@ -76,6 +59,11 @@ function recordPrice(foodId, cost) {
     }
 }
 
+/**
+ * Returns the median cost across all stored snapshots for a food.
+ * Median is used (not mean) so a single outlier reading can't skew the baseline.
+ * Returns null if no history exists yet.
+ */
 function getPriceBaseline(foodId) {
     const history = priceStore[foodId];
     if (!history || history.length === 0) return null;
@@ -87,9 +75,16 @@ function getPriceBaseline(foodId) {
         : sorted[mid];
 }
 
+
 // ─────────────────────────────────────────────────────────────────────────────
 // SPIKE DETECTOR
+// Compares a food's current cost against its baseline and classifies the spike.
 // ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Returns spike level + metadata for a single food item.
+ * @returns {{ level: 'warning'|'high'|'critical'|null, baseline: number|null, changePercent: number|null }}
+ */
 function getSpikeLevel(foodId, currentCost) {
     const baseline = getPriceBaseline(foodId);
     if (baseline === null || baseline <= 0) {
@@ -106,14 +101,20 @@ function getSpikeLevel(foodId, currentCost) {
     return {
         level,
         baseline:      Math.round(baseline * 100) / 100,
-        changePercent: Math.round(changePercent * 1000) / 10
+        changePercent: Math.round(changePercent * 1000) / 10  // e.g. 23.4 (%)
     };
 }
 
+/** Returns true if a food item's current cost is above any spike threshold. */
 function isSpiked(foodId, currentCost) {
     return getSpikeLevel(foodId, currentCost).level !== null;
 }
 
+/**
+ * Scans a full costed food list and returns all spiked items, sorted by severity.
+ * @param {{ food, calculatedCost }[]} foodsWithCosts
+ * @returns {SpikeReport[]}
+ */
 function detectSpikes(foodsWithCosts) {
     const levelOrder = { critical: 0, high: 1, warning: 2 };
     return foodsWithCosts
@@ -134,9 +135,19 @@ function detectSpikes(foodsWithCosts) {
         .sort((a, b) => levelOrder[a.level] - levelOrder[b.level]);
 }
 
+
 // ─────────────────────────────────────────────────────────────────────────────
 // SUBSTITUTE FINDER
+// Finds the best nutritionally equivalent cheaper replacement for a spiked food.
 // ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Scores a candidate substitute against the original on three axes:
+ *   - Calorie proximity  (weight 0.4)
+ *   - Protein proximity  (weight 0.4)
+ *   - Cost improvement   (weight 0.2)
+ * All normalised to 0–1. Candidate must be cheaper; otherwise cost score = 0.
+ */
 function scoreSubstitute(original, candidate) {
     const proximity = (orig, cand) =>
         orig <= 0 ? 1 : Math.max(0, 1 - Math.abs(cand - orig) / orig);
@@ -151,12 +162,26 @@ function scoreSubstitute(original, candidate) {
     return (calScore * 0.4) + (protScore * 0.4) + (costScore * 0.2);
 }
 
+/**
+ * Returns the diet types that are acceptable substitutes for a given type.
+ * Vegan can replace vegan.
+ * Vegetarian can replace vegan or vegetarian.
+ * Non-veg can only replace non-veg (hard dietary boundary).
+ */
 function getAcceptableSubstituteTypes(originalType) {
     if (originalType === 'vegan')      return ['vegan'];
     if (originalType === 'vegetarian') return ['vegan', 'vegetarian'];
     return ['vegan', 'vegetarian', 'non-vegetarian'];
 }
 
+/**
+ * Finds the best substitute for a spiked food within the same meal category.
+ * Returns null if no suitable candidate meets the minimum score threshold.
+ *
+ * @param {{ food, calculatedCost, calories, protein }} spikedItem
+ * @param {{ food, calculatedCost, calories, protein }[]} allCategoryItems
+ * @returns {object|null}
+ */
 function findSubstitute(spikedItem, allCategoryItems) {
     const spikedId          = spikedItem.food._id.toString();
     const acceptableTypes   = getAcceptableSubstituteTypes(spikedItem.food.type);
@@ -166,10 +191,10 @@ function findSubstitute(spikedItem, allCategoryItems) {
 
     for (const candidate of allCategoryItems) {
         const candidateId = candidate.food._id.toString();
-        if (candidateId === spikedId)                              continue;
-        if (!acceptableTypes.includes(candidate.food.type))       continue;
-        if (candidate.calculatedCost >= spikedItem.calculatedCost) continue;
-        if (isSpiked(candidateId, candidate.calculatedCost))       continue;
+        if (candidateId === spikedId)                              continue; // skip self
+        if (!acceptableTypes.includes(candidate.food.type))       continue; // diet boundary
+        if (candidate.calculatedCost >= spikedItem.calculatedCost) continue; // must be cheaper
+        if (isSpiked(candidateId, candidate.calculatedCost))       continue; // skip spiked candidates
 
         const score = scoreSubstitute(spikedItem, candidate);
         if (score > bestScore) {
@@ -189,9 +214,16 @@ function findSubstitute(spikedItem, allCategoryItems) {
     return { ...bestCandidate, substituteScore: Math.round(bestScore * 100) / 100, savingsPercent };
 }
 
+
 // ─────────────────────────────────────────────────────────────────────────────
 // BUDGET PRESSURE ANALYSER
+// Detects when cumulative inflation pushes prices beyond the user's budget.
 // ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Greedy lower-bound estimate: picks cheapest kcal/₹ foods until calorieTarget is met.
+ * This is a floor, not a real meal plan — used only for gap analysis.
+ */
 function estimateMinimumDailyCost(foodsWithCosts, calorieTarget) {
     const ranked = foodsWithCosts
         .filter(f => f.calories > 0)
@@ -211,6 +243,10 @@ function estimateMinimumDailyCost(foodsWithCosts, calorieTarget) {
     return totalCost;
 }
 
+/**
+ * Average price change vs historical median across all foods with price history.
+ * Returns null if fewer than 3 foods have history (not enough data).
+ */
 function computeBasketInflation(foodsWithCosts) {
     const changes = foodsWithCosts
         .map(({ food, calculatedCost }) => {
@@ -224,9 +260,14 @@ function computeBasketInflation(foodsWithCosts) {
     if (changes.length < 3) return null;
 
     const avg = changes.reduce((sum, c) => sum + c, 0) / changes.length;
-    return Math.round(avg * 1000) / 10;
+    return Math.round(avg * 1000) / 10; // e.g. 8.3 (%)
 }
 
+/**
+ * Analyses budget pressure for a user given their costed food list.
+ * @returns {{ level, userBudget, estimatedMinDailyCost, budgetGapPercent,
+ *             basketInflationPercent, recommendation }}
+ */
 function analyseBudgetPressure(user, foodsWithCosts) {
     const { budgetTarget, calorieTarget } = user;
 
@@ -265,153 +306,37 @@ function analyseBudgetPressure(user, foodsWithCosts) {
     };
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ADAPTIVE QUALITY & ALIGNMENT ENGINES (PART 4)
-// ─────────────────────────────────────────────────────────────────────────────
-
-function getBudgetLevel(dailyBudget) {
-    const budget = dailyBudget || 300;
-    if (budget < 150) return 'LOW';
-    if (budget < 300) return 'MEDIUM';
-    if (budget < 600) return 'HIGH';
-    return 'PREMIUM';
-}
-
-function calculateMealQualityScore(combo, budgetLevel, dietType) {
-    // 1. Protein Quality Score (max 30 points)
-    let totalProtein = combo.totalProtein || 0;
-    let proteinQualityScore = 0;
-    
-    if (totalProtein > 0) {
-        let weightedProteinSum = 0;
-        
-        combo.foods.forEach(f => {
-            const name = f.food.name.toLowerCase();
-            let pq = 0.5; // default lower quality (grains/flour/potato)
-            
-            if (dietType === 'non-vegetarian' || dietType === 'nonveg') {
-                if (name.includes('chicken') || name.includes('egg') || name.includes('fish') || name.includes('mutton') || name.includes('paneer') || name.includes('curd') || name.includes('milk') || name.includes('tofu') || name.includes('cheese') || name.includes('yogurt')) {
-                    pq = 1.0;
-                } else if (name.includes('soya') || name.includes('soy') || name.includes('sprout') || name.includes('chana') || name.includes('chickpea') || name.includes('dal') || name.includes('lentil') || name.includes('kidney') || name.includes('rajma')) {
-                    pq = 0.8;
-                }
-            } else if (dietType === 'vegetarian' || dietType === 'veg') {
-                if (name.includes('paneer') || name.includes('curd') || name.includes('milk') || name.includes('tofu') || name.includes('cheese') || name.includes('yogurt')) {
-                    pq = 1.0;
-                } else if (name.includes('soya') || name.includes('soy') || name.includes('sprout') || name.includes('chana') || name.includes('chickpea') || name.includes('dal') || name.includes('lentil') || name.includes('kidney') || name.includes('rajma')) {
-                    pq = 0.8;
-                }
-            } else { // vegan
-                if (name.includes('tofu') || name.includes('soya') || name.includes('soy') || name.includes('sprout')) {
-                    pq = 1.0;
-                } else if (name.includes('chana') || name.includes('chickpea') || name.includes('dal') || name.includes('lentil') || name.includes('kidney') || name.includes('rajma') || name.includes('peanuts')) {
-                    pq = 0.8;
-                }
-            }
-            
-            const proteinInFood = f.food.protein * f.portions;
-            weightedProteinSum += proteinInFood * pq;
-        });
-        
-        proteinQualityScore = (weightedProteinSum / totalProtein) * 30;
-    }
-    
-    // 2. Micronutrient Density Score (max 30 points)
-    let weightedMicroSum = 0;
-    let totalPortionsForMicro = 0;
-    
-    combo.foods.forEach(f => {
-        const name = f.food.name.toLowerCase();
-        let density = 0.3; // Default low density (flour, rice, oil, sugar, butter)
-        
-        if (name.includes('spinach') || name.includes('salad') || name.includes('veg') || name.includes('vegetable') || name.includes('tomato') || name.includes('onion') || name.includes('capsicum')) {
-            density = 1.0;
-        } else if (name.includes('fruit') || name.includes('oats') || name.includes('poha') || name.includes('dal') || name.includes('sprout') || name.includes('chana') || name.includes('chickpea') || name.includes('egg') || name.includes('fish') || name.includes('chicken') || name.includes('tofu') || name.includes('paneer') || name.includes('curd') || name.includes('milk') || name.includes('yogurt')) {
-            density = 0.7;
-        }
-        
-        weightedMicroSum += density * f.portions;
-        totalPortionsForMicro += f.portions;
-    });
-    
-    let microDensityScore = totalPortionsForMicro > 0 ? (weightedMicroSum / totalPortionsForMicro) * 30 : 0;
-    
-    // 3. Food Diversity Score (max 20 points)
-    let uniqueFoodsCount = combo.foods.length;
-    let foodDiversityScore = 8;
-    if (uniqueFoodsCount >= 3) {
-        foodDiversityScore = 20;
-    } else if (uniqueFoodsCount === 2) {
-        foodDiversityScore = 15;
-    }
-    
-    // 4. Processing Level Score (max 10 points)
-    let weightedProcessingSum = 0;
-    let totalPortionsForProc = 0;
-    combo.foods.forEach(f => {
-        const name = f.food.name.toLowerCase();
-        let proc = 0.7; // default moderately processed
-        
-        if (name.includes('salad') || name.includes('fruit') || name.includes('dal') || name.includes('rice') || name.includes('chicken breast') || name.includes('fish') || name.includes('mutton') || name.includes('egg') || name.includes('oats') || name.includes('sprout') || name.includes('spinach') || name.includes('chana') || name.includes('chickpea')) {
-            proc = 1.0; // whole, natural
-        } else if (name.includes('biscuit') || name.includes('bar') || name.includes('pasta') || name.includes('bread') || name.includes('cheese') || name.includes('dosa') || name.includes('idli')) {
-            proc = 0.3; // highly processed
-        }
-        
-        weightedProcessingSum += proc * f.portions;
-        totalPortionsForProc += f.portions;
-    });
-    let processingLevelScore = totalPortionsForProc > 0 ? (weightedProcessingSum / totalPortionsForProc) * 10 : 0;
-    
-    // 5. Budget Alignment & Ingredient Quality Score (max 10 points)
-    let alignmentScore = 100;
-    if (budgetLevel === 'LOW') {
-        let premiumItemsCount = 0;
-        combo.foods.forEach(f => {
-            const name = f.food.name.toLowerCase();
-            if (name.includes('almond') || name.includes('fish') || name.includes('mutton') || name.includes('cheese') || name.includes('paneer') || name.includes('bar')) {
-                premiumItemsCount++;
-            }
-        });
-        alignmentScore = Math.max(0, 100 - premiumItemsCount * 25);
-        
-        let hasCheapStaple = false;
-        combo.foods.forEach(f => {
-            const name = f.food.name.toLowerCase();
-            if (name.includes('dal') || name.includes('soya') || name.includes('peanut') || name.includes('egg')) {
-                hasCheapStaple = true;
-            }
-        });
-        if (hasCheapStaple) alignmentScore = Math.min(100, alignmentScore + 10);
-    } else if (budgetLevel === 'HIGH' || budgetLevel === 'PREMIUM') {
-        let hasPremiumUpgrade = false;
-        combo.foods.forEach(f => {
-            const name = f.food.name.toLowerCase();
-            if (name.includes('paneer') || name.includes('tofu') || name.includes('almond') || name.includes('egg') || name.includes('chicken') || name.includes('fish') || name.includes('fruit') || name.includes('salad') || name.includes('yogurt') || name.includes('cheese')) {
-                hasPremiumUpgrade = true;
-            }
-        });
-        alignmentScore = hasPremiumUpgrade ? 100 : 40;
-    } else { // MEDIUM
-        let hasMidUpgrade = false;
-        combo.foods.forEach(f => {
-            const name = f.food.name.toLowerCase();
-            if (name.includes('paneer') || name.includes('tofu') || name.includes('egg') || name.includes('chicken') || name.includes('sprout') || name.includes('curd')) {
-                hasMidUpgrade = true;
-            }
-        });
-        alignmentScore = hasMidUpgrade ? 100 : 70;
-    }
-    let budgetAlignmentScore = (alignmentScore / 100) * 10;
-    
-    return Math.round(proteinQualityScore + microDensityScore + foodDiversityScore + processingLevelScore + budgetAlignmentScore);
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
-// MEAL OPTIMIZER CLASS
+// MEAL OPTIMIZER
 // ─────────────────────────────────────────────────────────────────────────────
 
 class MealOptimizer {
+    /**
+     * Generates optimal meals matching calorie, diet, and budget constraints.
+     *
+     * Options:
+     *   - mode:        'normal' | 'student' | 'budget_challenge'
+     *   - budgetLimit: maximum daily budget for budget_challenge (e.g. ₹100/day)
+     *
+     * Result shape (normal / student):
+     * {
+     *   Breakfast, Lunch, Dinner, Snacks,   ← same as before
+     *   priceAlerts:    SpikeReport[],       ← NEW: foods with price spikes
+     *   budgetPressure: BudgetPressureReport ← NEW: inflation / budget gap
+     * }
+     *
+     * Each combo now also carries:
+     *   priceAlerts[]:    spikes within this combo's foods
+     *   substitutions[]:  auto-applied swaps for spiked foods
+     *   isSubstituted:    true when at least one food was replaced
+     *
+     * Result shape (budget_challenge):
+     * {
+     *   dailyPlans: [...],   ← same as before
+     *   priceAlerts, budgetPressure
+     * }
+     */
     async buildMealCombos(user, options = {}) {
         const { mode = 'normal', budgetLimit = null } = options;
 
@@ -437,19 +362,20 @@ class MealOptimizer {
             throw new Error(`MealOptimizer: Failed to calculate food costs — ${err.message}`);
         }
 
-        // ── Step 1: Record prices into history ──
+        // ── Step 1: Record today's prices into rolling history ──
         for (const { food, calculatedCost } of foodsWithCosts) {
             recordPrice(food._id.toString(), calculatedCost);
         }
 
-        // ── Step 2: Detect spikes ──
+        // ── Step 2: Detect spikes; build fast foodId → spike lookup ──
         const globalSpikes = detectSpikes(foodsWithCosts);
         const spikeMap     = new Map(globalSpikes.map(s => [s.foodId, s]));
 
         // ── Step 3: Budget pressure analysis ──
         const budgetPressure = analyseBudgetPressure(user, foodsWithCosts);
 
-        // ── Step 4: Build substitute lookup ──
+        // ── Step 4: Build substitute lookup for every spiked food ──
+        // substituteLookup: foodId → best substitute item (or null)
         const substituteLookup = new Map();
         for (const spike of globalSpikes) {
             const spikedItem     = foodsWithCosts.find(f => f.food._id.toString() === spike.foodId);
@@ -475,8 +401,6 @@ class MealOptimizer {
             budgetPressure
         };
 
-        const budgetLevel = getBudgetLevel(user.budgetTarget);
-
         for (const [category, fraction] of Object.entries(splits)) {
             const targetCal      = calorieTarget * fraction;
             const categoryBudget = user.budgetTarget * fraction;
@@ -487,6 +411,7 @@ class MealOptimizer {
             for (const item of categoryFoods) {
                 if (item.calories <= 0) continue;
 
+                // Step 5: Swap spiked item for substitute if one was found
                 const resolved = this._resolveItem(item, substituteLookup);
 
                 const optimalPortions = Math.max(
@@ -497,13 +422,12 @@ class MealOptimizer {
 
                 if (Math.abs(adjustedCals - targetCal) <= targetCal * CALORIE_TOLERANCE) {
                     const adjustedCost       = resolved.calculatedCost * optimalPortions;
-                    const affordabilityScore = adjustedCost <= categoryBudget ? 100 : Math.max(0, Math.round(100 - ((adjustedCost - categoryBudget) / categoryBudget) * 100));
-                    
+                    const affordabilityScore = this.calculateAffordability(adjustedCost, categoryBudget);
                     const studentFriendly    =
                         resolved.food.studentFriendly &&
                         adjustedCost <= STUDENT_FRIENDLY_COST_PER_ITEM * optimalPortions;
 
-                    const combo = {
+                    validCombos.push({
                         foods:             [{ food: resolved.food, portions: optimalPortions }],
                         totalCalories:     Math.round(adjustedCals),
                         totalCost:         Math.round(adjustedCost * 100) / 100,
@@ -514,29 +438,13 @@ class MealOptimizer {
                         priceAlerts:       this._comboAlerts([item], spikeMap),
                         substitutions:     resolved.substitution ? [resolved.substitution] : [],
                         isSubstituted:     !!resolved.substitution
-                    };
-
-                    combo.mealQualityScore = calculateMealQualityScore(combo, budgetLevel, user.dietType);
-                    
-                    // Calorie Fit Score (0-100)
-                    const calDiff = Math.abs(combo.totalCalories - targetCal);
-                    const calFitScore = Math.max(0, 100 - (calDiff / targetCal) * 100);
-                    
-                    combo.finalScore = Math.round(calFitScore * 0.4 + combo.mealQualityScore * 0.3 + combo.affordabilityScore * 0.3);
-
-                    // Under low budget, filter out extremely premium single options
-                    if (budgetLevel === 'LOW') {
-                        const name = resolved.food.name.toLowerCase();
-                        if (name.includes('fish') || name.includes('mutton') || name.includes('almond') || name.includes('bar')) {
-                            continue;
-                        }
-                    }
-
-                    validCombos.push(combo);
+                    });
                 }
             }
 
             // ── 2. Double combinations ──
+            // Note: slicing to top-50 cheapest items is a deliberate perf trade-off.
+            // Increase the slice limit if budget allows more exhaustive search.
             const affordableCategoryFoods = [...categoryFoods]
                 .sort((a, b) => a.calculatedCost - b.calculatedCost)
                 .slice(0, 50);
@@ -558,8 +466,7 @@ class MealOptimizer {
                     const combinedProtein = (itemA.protein * portA) + (itemB.protein * portB);
 
                     if (Math.abs(combinedCals - targetCal) <= targetCal * CALORIE_TOLERANCE) {
-                        const affordabilityScore = combinedCost <= categoryBudget ? 100 : Math.max(0, Math.round(100 - ((combinedCost - categoryBudget) / categoryBudget) * 100));
-                        
+                        const affordabilityScore = this.calculateAffordability(combinedCost, categoryBudget);
                         const studentFriendly    =
                             itemA.food.studentFriendly &&
                             itemB.food.studentFriendly &&
@@ -570,7 +477,7 @@ class MealOptimizer {
                             ...(itemB.substitution ? [itemB.substitution] : [])
                         ];
 
-                        const combo = {
+                        validCombos.push({
                             foods: [
                                 { food: itemA.food, portions: portA },
                                 { food: itemB.food, portions: portB }
@@ -587,25 +494,7 @@ class MealOptimizer {
                             priceAlerts:   this._comboAlerts([rawA, rawB], spikeMap),
                             substitutions,
                             isSubstituted: substitutions.length > 0
-                        };
-
-                        combo.mealQualityScore = calculateMealQualityScore(combo, budgetLevel, user.dietType);
-                        
-                        const calDiff = Math.abs(combo.totalCalories - targetCal);
-                        const calFitScore = Math.max(0, 100 - (calDiff / targetCal) * 100);
-                        
-                        combo.finalScore = Math.round(calFitScore * 0.4 + combo.mealQualityScore * 0.3 + combo.affordabilityScore * 0.3);
-
-                        // Under low budget, filter out extremely premium combinations
-                        if (budgetLevel === 'LOW') {
-                            const nameA = itemA.food.name.toLowerCase();
-                            const nameB = itemB.food.name.toLowerCase();
-                            if (nameA.includes('mutton') || nameB.includes('mutton') || nameA.includes('fish') || nameB.includes('fish') || (nameA.includes('almond') && nameB.includes('almond'))) {
-                                continue;
-                            }
-                        }
-
-                        validCombos.push(combo);
+                        });
                     }
                 }
             }
@@ -614,24 +503,22 @@ class MealOptimizer {
             if (mode === 'student') {
                 result[category] = validCombos
                     .filter(c => c.studentFriendly)
-                    .sort((a, b) => b.finalScore - a.finalScore)
+                    .sort((a, b) => (b.totalProtein / b.totalCost) - (a.totalProtein / a.totalCost))
                     .slice(0, 5);
             } else if (mode === 'budget_challenge') {
-                // In challenge mode, we sort categories by cost to find cheapest daily plans
                 result[category] = validCombos
                     .sort((a, b) => a.totalCost - b.totalCost)
-                    .slice(0, 8); // larger pool to combine
+                    .slice(0, 5);
             } else {
-                // Balanced mode sorts by composite score
                 result[category] = validCombos
-                    .sort((a, b) => b.finalScore - a.finalScore)
+                    .sort((a, b) => a.totalCost - b.totalCost)
                     .slice(0, 5);
             }
         }
 
         if (mode === 'budget_challenge') {
             return {
-                dailyPlans:    this.applyDailyBudgetConstrainedPlans(result, budgetLimit ?? 100, user),
+                dailyPlans:    this.applyDailyBudgetConstrainedPlans(result, budgetLimit ?? 100),
                 priceAlerts:   result.priceAlerts,
                 budgetPressure: result.budgetPressure
             };
@@ -640,10 +527,18 @@ class MealOptimizer {
         return result;
     }
 
+    // ─────────────────────────────────────────────────────────────────────────
+    // Price optimization helpers
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /**
+     * If an item is spiked and has a substitute, returns the substitute decorated
+     * with a `substitution` descriptor. Otherwise returns the original unchanged.
+     */
     _resolveItem(item, substituteLookup) {
         const id  = item.food._id.toString();
         const sub = substituteLookup.get(id);
-        if (!sub) return item;
+        if (!sub) return item; // not spiked, or spiked but no suitable substitute
 
         return {
             ...sub,
@@ -661,11 +556,16 @@ class MealOptimizer {
         };
     }
 
+    /** Returns spike reports for the original (pre-substitution) foods in a combo. */
     _comboAlerts(rawItems, spikeMap) {
         return rawItems
             .map(item => spikeMap.get(item.food._id.toString()))
             .filter(Boolean);
     }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Core helpers (unchanged interface)
+    // ─────────────────────────────────────────────────────────────────────────
 
     getAllowedFoodTypes(dietType) {
         if (dietType === 'vegan') return ['vegan'];
@@ -689,7 +589,12 @@ class MealOptimizer {
         }, []);
     }
 
-    applyDailyBudgetConstrainedPlans(categoryCombos, dailyLimit, user) {
+    /**
+     * Finds daily combinations under a budget cap across all four meal categories.
+     * O(n⁴) — safe because each category array is sliced to 5 (5^4 = 625 max iterations).
+     * If the upstream slice limit ever increases, switch to a DP approach.
+     */
+    applyDailyBudgetConstrainedPlans(categoryCombos, dailyLimit) {
         const { Breakfast: breakfast, Lunch: lunch, Dinner: dinner, Snacks: snacks } = categoryCombos;
         const dailyPlans = [];
 
@@ -697,32 +602,15 @@ class MealOptimizer {
             for (const lu of lunch) {
                 for (const dn of dinner) {
                     for (const sn of snacks) {
-                        const totalCost = bf.totalCost + lu.totalCost + dn.totalCost + sn.totalCost;
+                        const totalCost =
+                            bf.totalCost + lu.totalCost + dn.totalCost + sn.totalCost;
                         if (totalCost <= dailyLimit) {
-                            const totalDailyCalories = bf.totalCalories + lu.totalCalories + dn.totalCalories + sn.totalCalories;
-                            const totalDailyProtein = bf.totalProtein + lu.totalProtein + dn.totalProtein + sn.totalProtein;
-                            
-                            // Daily Quality
-                            const dailyQualityScore = Math.round((bf.mealQualityScore + lu.mealQualityScore + dn.mealQualityScore + sn.mealQualityScore) / 4);
-                            
-                            // Daily Affordability
-                            const dailyAffordabilityScore = totalCost <= dailyLimit ? 100 : Math.max(0, Math.round(100 - ((totalCost - dailyLimit) / dailyLimit) * 100));
-                            
-                            // Calorie Fit Score
-                            const calDiff = Math.abs(totalDailyCalories - user.calorieTarget);
-                            const calFitScore = Math.max(0, 100 - (calDiff / user.calorieTarget) * 100);
-                            
-                            // Daily Rank Score
-                            const dailyRankScore = Math.round(calFitScore * 0.4 + dailyQualityScore * 0.3 + dailyAffordabilityScore * 0.3);
-
                             dailyPlans.push({
                                 meals: { Breakfast: bf, Lunch: lu, Dinner: dn, Snacks: sn },
                                 totalDailyCost: Math.round(totalCost * 100) / 100,
-                                totalDailyCalories,
-                                totalDailyProtein,
-                                dailyQualityScore,
-                                dailyAffordabilityScore,
-                                dailyRankScore
+                                totalDailyCalories:
+                                    bf.totalCalories + lu.totalCalories +
+                                    dn.totalCalories + sn.totalCalories
                             });
                         }
                     }
@@ -731,7 +619,7 @@ class MealOptimizer {
         }
 
         return dailyPlans
-            .sort((a, b) => b.dailyRankScore - a.dailyRankScore)
+            .sort((a, b) => a.totalDailyCost - b.totalDailyCost)
             .slice(0, 5);
     }
 }

@@ -30,21 +30,21 @@ let spendingChart  = null;
 const DIET_CONFIG = {
     veg: {
         label:      'Vegetarian',
-        icon:       '',
+        icon:       `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:12px;height:12px;display:inline-block;vertical-align:middle;margin-right:4px;color:#2D7A4A;"><path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 2 2 4a7 7 0 0 1-10 14z"/><path d="M19 2c-2.26 4.33-5.27 7.14-8 10"/></svg>`,
         badgeClass: 'badge-veg',
         allowed:    ['vegetarian', 'vegan'],
         color:      '#2D7A4A'
     },
     vegan: {
         label:      'Vegan',
-        icon:       '',
+        icon:       `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:12px;height:12px;display:inline-block;vertical-align:middle;margin-right:4px;color:#388E3C;"><path d="M12 2a10 10 0 0 1 10 10c0 5.523-4.477 10-10 10S2 17.523 2 12 6.477 2 12 2zm0 5a5 5 0 0 0-5 5h10a5 5 0 0 0-5-5z"/></svg>`,
         badgeClass: 'badge-vegan',
         allowed:    ['vegan'],
         color:      '#388E3C'
     },
     nonveg: {
         label:      'Non-Vegetarian',
-        icon:       '',
+        icon:       `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:12px;height:12px;display:inline-block;vertical-align:middle;margin-right:4px;color:#B33A2A;"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>`,
         badgeClass: 'badge-non-veg',
         allowed:    ['vegetarian', 'vegan', 'non-vegetarian'],
         color:      '#B33A2A'
@@ -381,11 +381,11 @@ function calculatePlan() {
     if (goal === 'gain') calorieTarget += 500;
     calorieTarget = Math.round(calorieTarget);
 
-    document.getElementById('res-calories').textContent = calorieTarget;
-    document.getElementById('split-bk').textContent = Math.round(calorieTarget * 0.25) + ' kcal';
-    document.getElementById('split-lu').textContent = Math.round(calorieTarget * 0.35) + ' kcal';
-    document.getElementById('split-di').textContent = Math.round(calorieTarget * 0.30) + ' kcal';
-    document.getElementById('split-sn').textContent = Math.round(calorieTarget * 0.10) + ' kcal';
+    document.getElementById('res-calories').textContent = calorieTarget.toFixed(2);
+    document.getElementById('split-bk').textContent = (calorieTarget * 0.25).toFixed(2) + ' kcal';
+    document.getElementById('split-lu').textContent = (calorieTarget * 0.35).toFixed(2) + ' kcal';
+    document.getElementById('split-di').textContent = (calorieTarget * 0.30).toFixed(2) + ' kcal';
+    document.getElementById('split-sn').textContent = (calorieTarget * 0.10).toFixed(2) + ' kcal';
 
     const conf = DIET_CONFIG[dietType];
     const badge = document.getElementById('result-diet-badge');
@@ -446,10 +446,17 @@ async function refreshDashboard() {
     const target    = currentUser.calorieTarget || 2000;
     const remaining = Math.max(0, target - consumed);
 
-    document.getElementById('dash-remaining').textContent  = remaining;
-    document.getElementById('dash-consumed').textContent   = consumed;
-    document.getElementById('dash-target-lbl').textContent = target;
+    document.getElementById('dash-remaining').textContent  = remaining.toFixed(2);
+    document.getElementById('dash-consumed').textContent   = consumed.toFixed(2);
+    document.getElementById('dash-target-lbl').textContent = target.toFixed(2);
     document.getElementById('stat-logs-today').textContent = todayLogs.length;
+
+    // Set meal allowances dynamically to 2 decimal places
+    const splitsVal = { bk: 0.25, lu: 0.35, di: 0.30, sn: 0.10 };
+    for (const [key, pct] of Object.entries(splitsVal)) {
+        const el = document.getElementById(`meal-cal-${key}`);
+        if (el) el.textContent = (target * pct).toFixed(2);
+    }
 
     renderCalorieDonut(consumed, remaining, target);
 
@@ -495,8 +502,13 @@ function renderBudgetBurnChart(spent, target) {
     });
 }
 
+let sliderTimeout = null;
 function updateBudgetSliderVal(val) {
     document.getElementById('slider-val').textContent = val;
+    if (sliderTimeout) clearTimeout(sliderTimeout);
+    sliderTimeout = setTimeout(() => {
+        saveBudgetSliderVal(val);
+    }, 250);
 }
 
 async function saveBudgetSliderVal(val) {
@@ -576,12 +588,10 @@ async function renderMealRecommendations() {
         activeRecommendations = await res.json();
         
         if (currentOptMode === 'budget_challenge') {
-            // Render the special ₹100 Challenge daily set
-            renderBudgetChallengeRecommendations(activeRecommendations);
+            renderBudgetChallengeRecommendations(activeRecommendations.dailyPlans);
             return;
         }
 
-        // Restore normal headers & panels layout in case they were altered by ₹100 Challenge mode
         restoreRegularTabsUI();
 
         for (const [key, categoryName] of Object.entries(splits)) {
@@ -596,20 +606,18 @@ async function renderMealRecommendations() {
             }
 
             recEl.innerHTML = combos.map((combo, idx) => {
-                // Determine affordability badges
-                let badgeClass = 'badge-veg'; // green
+                let badgeClass = 'badge-veg';
                 let badgeLabel = 'Affordable';
                 const catBudget = currentUser.budgetTarget * (categoryName === 'Breakfast' ? 0.25 : categoryName === 'Lunch' ? 0.35 : categoryName === 'Dinner' ? 0.30 : 0.10);
                 
                 if (combo.totalCost > catBudget * 1.2) {
-                    badgeClass = 'badge-non-veg'; // red
+                    badgeClass = 'badge-non-veg';
                     badgeLabel = 'Premium';
                 } else if (combo.totalCost > catBudget) {
-                    badgeClass = 'badge-vegan'; // yellow/amber
+                    badgeClass = 'badge-vegan';
                     badgeLabel = 'Moderate';
                 }
 
-                // Check for swaps
                 const swapBtnHTML = (combo.swaps && combo.swaps.length > 0)
                     ? `<button class="swap-action-btn" onclick="executeSwap('${categoryName}', ${idx})">Swap </button>`
                     : '';
@@ -621,7 +629,7 @@ async function renderMealRecommendations() {
                 const foodItemsHTML = combo.foods.map(item => `
                     <div class="combo-sub-food">
                         <span>${item.food.name}</span>
-                        <span>${(item.food.calories * item.portions).toFixed(2)} kcal · P: ${(item.food.protein * item.portions).toFixed(2)}g</span>
+                        <span>${(item.food.calories * item.portions).toFixed(2)} kcal · P: ${(item.food.protein * item.portions).toFixed(1)}g</span>
                     </div>
                 `).join('');
 
@@ -631,8 +639,12 @@ async function renderMealRecommendations() {
                     <div class="rec-combo-card" id="card-${categoryName}-${idx}">
                         <div class="combo-top">
                             <span class="combo-cost" id="cost-${categoryName}-${idx}">₹${Math.round(combo.totalCost)}</span>
-                            <span class="rec-item-badge ${badgeClass}">${badgeLabel}</span>
-                            <span class="combo-cals" id="cals-${categoryName}-${idx}">${combo.totalCalories} kcal</span>
+                            <div class="combo-badges" style="display:flex;gap:0.25rem;">
+                                <span class="rec-item-badge ${badgeClass}">${badgeLabel}</span>
+                                <span class="rec-item-badge" style="background:#E3F2FD;color:#1565C0;">Q: ${combo.mealQualityScore}/100</span>
+                                <span class="rec-item-badge" style="background:#FFF3E0;color:#E65100;">A: ${combo.affordabilityScore}%</span>
+                            </div>
+                            <span class="combo-cals" id="cals-${categoryName}-${idx}">${parseFloat(combo.totalCalories).toFixed(2)} kcal · P: ${combo.totalProtein}g</span>
                         </div>
                         <div class="combo-foods-list" id="foods-${categoryName}-${idx}">
                             ${foodItemsHTML}
@@ -667,11 +679,9 @@ function restoreRegularTabsUI() {
 function renderBudgetChallengeRecommendations(plans) {
     restoreRegularTabsUI();
     
-    // Hide regular category selector tabs since this returns integrated daily plans!
     const mealTabs = document.querySelector('.meal-tabs');
     if (mealTabs) mealTabs.style.display = 'none';
 
-    // Show plans directly inside Breakfast panel and hide all other panels
     const panels = document.querySelectorAll('.mtab-panel');
     panels.forEach(p => {
         if (p.id === 'panel-bk') {
@@ -700,7 +710,7 @@ function renderBudgetChallengeRecommendations(plans) {
                 <div class="challenge-meal-row">
                     <span class="challenge-cat">${catName}:</span>
                     <span class="challenge-food">${foodNames}</span>
-                    <span class="challenge-metrics">₹${Math.round(combo.totalCost)} · ${combo.totalCalories} kcal</span>
+                    <span class="challenge-metrics">₹${Math.round(combo.totalCost)} · ${parseFloat(combo.totalCalories).toFixed(2)} kcal · P: ${combo.totalProtein}g</span>
                 </div>
             `;
         }).join('');
@@ -709,8 +719,12 @@ function renderBudgetChallengeRecommendations(plans) {
             <div class="challenge-plan-card">
                 <div class="challenge-plan-top">
                     <span class="challenge-daily-cost">₹${Math.round(plan.totalDailyCost)} / day</span>
-                    <span class="rec-item-badge badge-vegan">₹100 Challenge </span>
-                    <span class="challenge-daily-cals">${plan.totalDailyCalories} kcal</span>
+                    <div class="combo-badges" style="display:flex;gap:0.25rem;align-items:center;">
+                        <span class="rec-item-badge badge-vegan">₹100 Challenge </span>
+                        <span class="rec-item-badge" style="background:#E3F2FD;color:#1565C0;">Q: ${plan.dailyQualityScore}/100</span>
+                        <span class="rec-item-badge" style="background:#FFF3E0;color:#E65100;">A: ${plan.dailyAffordabilityScore}%</span>
+                    </div>
+                    <span class="challenge-daily-cals">${parseFloat(plan.totalDailyCalories).toFixed(2)} kcal · P: ${plan.totalDailyProtein}g</span>
                 </div>
                 <div class="challenge-meals-box">
                     ${mealsHTML}
@@ -723,8 +737,8 @@ function renderBudgetChallengeRecommendations(plans) {
 
 //  Log the entire ₹100 challenge daily set 
 async function logBudgetChallengeDay(idx) {
-    if (!activeRecommendations || !activeRecommendations[idx]) return;
-    const plan = activeRecommendations[idx];
+    if (!activeRecommendations || !activeRecommendations.dailyPlans || !activeRecommendations.dailyPlans[idx]) return;
+    const plan = activeRecommendations.dailyPlans[idx];
     
     if (!confirm(`Log all meals in Plan #${idx+1} for today? (Total Cost: ₹${Math.round(plan.totalDailyCost)})`)) return;
 
@@ -860,14 +874,14 @@ function populateFoodSelect() {
     const splits = { 'Breakfast': 0.25, 'Lunch': 0.35, 'Dinner': 0.30, 'Snacks': 0.10 };
 
     sel.innerHTML = categories.map(cat => {
-        const allowance = Math.round(target * splits[cat]);
+        const allowance = (target * splits[cat]).toFixed(2);
         const items = dietFoods
-            .filter(f => f.category === cat && f.calories <= allowance)
+            .filter(f => f.category === cat && f.calories <= parseFloat(allowance))
             .slice(0, 20);
             
         if (!items.length) return '';
         return `<optgroup label="${cat} (Max ${allowance} kcal)">${items.map(f =>
-            `<option value="${f._id}" data-cal="${f.calories}" data-name="${f.name}" data-type="${f.type}" data-protein="${f.protein}" data-carbs="${f.carbs}" data-fats="${f.fats}">${f.name} (${f.calories} kcal)</option>`
+            `<option value="${f._id}" data-cal="${f.calories}" data-name="${f.name}" data-type="${f.type}" data-protein="${f.protein}" data-carbs="${f.carbs}" data-fats="${f.fats}">${f.name} (${parseFloat(f.calories).toFixed(2)} kcal)</option>`
         ).join('')}</optgroup>`;
     }).join('');
 
@@ -885,8 +899,8 @@ function updateFoodPreview() {
     if (!sel || !preview || !sel.options[sel.selectedIndex]) return;
     const opt      = sel.options[sel.selectedIndex];
     if (!opt.dataset.cal) { preview.classList.add('hidden'); return; }
-    const portions = parseFloat(document.getElementById('log-portions').value) || 1;
-    const cal      = Math.round(parseFloat(opt.dataset.cal) * portions);
+    const portions = parseInt(document.getElementById('log-portions').value, 10) || 1;
+    const cal      = (parseFloat(opt.dataset.cal) * portions).toFixed(2);
     const protein  = (parseFloat(opt.dataset.protein || 0) * portions).toFixed(1);
     const carbs    = (parseFloat(opt.dataset.carbs || 0) * portions).toFixed(1);
     const fats     = (parseFloat(opt.dataset.fats || 0) * portions).toFixed(1);
@@ -898,7 +912,7 @@ function updateFoodPreview() {
 
 function adjustPortion(delta) {
     const input = document.getElementById('log-portions');
-    input.value = Math.max(0.5, parseFloat(((parseFloat(input.value) || 1) + delta).toFixed(1)));
+    input.value = Math.max(1, (parseInt(input.value, 10) || 1) + delta);
     updateFoodPreview();
 }
 
@@ -906,12 +920,12 @@ document.addEventListener('change', e => { if (e.target.id === 'log-portions') u
 
 async function logFood() {
     const sel      = document.getElementById('log-food-select');
-    const portions = parseFloat(document.getElementById('log-portions').value) || 1;
+    const portions = parseInt(document.getElementById('log-portions').value, 10) || 1;
     if (!sel || !sel.options[sel.selectedIndex] || !sel.options[sel.selectedIndex].dataset.cal)
         return showToast('Please select a food item.');
 
     const opt      = sel.options[sel.selectedIndex];
-    const calories = Math.round(parseFloat(opt.dataset.cal) * portions);
+    const calories = parseFloat((parseFloat(opt.dataset.cal) * portions).toFixed(2));
 
     try {
         const res = await fetchAPI('/logs', {
@@ -938,7 +952,7 @@ async function refreshFoodLog() {
 
     renderLogList();
     document.getElementById('log-total-cal').textContent =
-        todayLogs.reduce((s, l) => s + (l.calories || 0), 0);
+        todayLogs.reduce((s, l) => s + (l.calories || 0), 0).toFixed(2);
 }
 
 function renderLogList() {
@@ -954,7 +968,7 @@ function renderLogList() {
                 <div class="log-entry-name">${log.foodName}</div>
                 <div class="log-entry-meta">×${log.portions} portion${log.portions !== 1 ? 's' : ''}</div>
             </div>
-            <span class="log-entry-cal">${log.calories} kcal · ₹${Math.round(log.cost || 0)}</span>
+            <span class="log-entry-cal">${parseFloat(log.calories).toFixed(2)} kcal · ₹${Math.round(log.cost || 0)}</span>
             <button class="log-del-btn" onclick="deleteLog('${log._id}')" title="Remove">×</button>
         </li>`).join('');
 }
@@ -967,7 +981,7 @@ async function deleteLog(id) {
         renderLogList();
         
         const newTotal = todayLogs.reduce((s, l) => s + (l.calories || 0), 0);
-        document.getElementById('log-total-cal').textContent = newTotal;
+        document.getElementById('log-total-cal').textContent = newTotal.toFixed(2);
         showToast('Entry removed.');
     } catch {
         showToast('Error removing entry.', 'error');
@@ -1010,8 +1024,7 @@ async function saveDietChange() {
         currentUser = await res.json();
         closeDietModal();
 
-        const conf = DIET_CONFIG[newDiet];
-        showToast(`Diet updated to ${conf.icon} ${conf.label}!`);
+        showToast(`Diet updated to ${currentUser.dietType.toUpperCase()}!`);
 
         refreshDashboard();
     } catch {
@@ -1375,7 +1388,11 @@ async function generateRecipe() {
         return;
     }
 
-    const dietIcons = { veg: '🥦', vegan: '', nonveg: '' };
+    const dietIcons = {
+        veg: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px;display:inline-block;vertical-align:middle;margin-right:2px;color:#1A6B35;"><path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 2 2 4a7 7 0 0 1-10 14z"/><path d="M19 2c-2.26 4.33-5.27 7.14-8 10"/></svg>`,
+        vegan: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px;display:inline-block;vertical-align:middle;margin-right:2px;color:#2E7D32;"><path d="M12 2a10 10 0 0 1 10 10c0 5.523-4.477 10-10 10S2 17.523 2 12 6.477 2 12 2zm0 5a5 5 0 0 0-5 5h10a5 5 0 0 0-5-5z"/></svg>`,
+        nonveg: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px;display:inline-block;vertical-align:middle;margin-right:2px;color:#9B2A1A;"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>`
+    };
     const dietLabels = { veg: 'Vegetarian', vegan: 'Vegan', nonveg: 'Non-Veg' };
     const dietBadgeCls = { veg: 'badge-veg', vegan: 'badge-vegan', nonveg: 'badge-non-veg' };
 
@@ -1388,8 +1405,8 @@ async function generateRecipe() {
             <p>${r.steps}</p>
             <div class="recipe-tags">
                 <span class="recipe-tag ${dietBadgeCls[r.diet]}">${dietIcons[r.diet]} ${dietLabels[r.diet]}</span>
-                <span class="recipe-tag tag-amber">⏱ ${r.time}</span>
-                <span class="recipe-tag tag-rust"> ${r.cal} kcal</span>
+                <span class="recipe-tag tag-amber"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:10px;height:10px;display:inline-block;vertical-align:middle;margin-right:2px;"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg> ${r.time}</span>
+                <span class="recipe-tag tag-rust"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:10px;height:10px;display:inline-block;vertical-align:middle;margin-right:2px;"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg> ${parseFloat(r.cal).toFixed(2)} kcal</span>
                 ${r.tags.map(t => `<span class="recipe-tag">${t}</span>`).join('')}
             </div>
         </div>`).join('');
