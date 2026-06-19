@@ -628,7 +628,7 @@ async function renderMealRecommendations() {
 
                 const foodItemsHTML = combo.foods.map(item => `
                     <div class="combo-sub-food">
-                        <span>${item.food.name}</span>
+                        <span>${item.food.name} <small style="color:#888;">(~${item.servingGrams || Math.round(((item.food.protein||0)+(item.food.carbs||0)+(item.food.fats||0))*2.8)}g)</small></span>
                         <span>${(item.food.calories * item.portions).toFixed(2)} kcal · P: ${(item.food.protein * item.portions).toFixed(1)}g</span>
                     </div>
                 `).join('');
@@ -705,7 +705,7 @@ function renderBudgetChallengeRecommendations(plans) {
 
     listEl.innerHTML = plans.map((plan, idx) => {
         const mealsHTML = Object.entries(plan.meals).map(([catName, combo]) => {
-            const foodNames = combo.foods.map(f => `${f.food.name}`).join(' + ');
+            const foodNames = combo.foods.map(f => `${f.food.name} (~${f.servingGrams || Math.round(((f.food.protein||0)+(f.food.carbs||0)+(f.food.fats||0))*2.8)}g)`).join(' + ');
             return `
                 <div class="challenge-meal-row">
                     <span class="challenge-cat">${catName}:</span>
@@ -751,7 +751,7 @@ async function logBudgetChallengeDay(idx) {
                         foodId: item.food._id,
                         foodName: item.food.name,
                         calories: item.food.calories * item.portions,
-                        portions: item.portions,
+                        portions: Math.round(item.portions),
                         type: item.food.type
                     })
                 });
@@ -834,7 +834,7 @@ async function logOptimizedCombo(category, idx) {
                     foodId: item.food._id,
                     foodName: logName,
                     calories: logCals,
-                    portions: item.portions,
+                    portions: Math.round(item.portions),
                     type: item.food.type
                 })
             });
@@ -876,8 +876,7 @@ function populateFoodSelect() {
     sel.innerHTML = categories.map(cat => {
         const allowance = (target * splits[cat]).toFixed(2);
         const items = dietFoods
-            .filter(f => f.category === cat && f.calories <= parseFloat(allowance))
-            .slice(0, 20);
+            .filter(f => f.category === cat && f.calories <= parseFloat(allowance));
             
         if (!items.length) return '';
         return `<optgroup label="${cat} (Max ${allowance} kcal)">${items.map(f =>

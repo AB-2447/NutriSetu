@@ -483,149 +483,260 @@ class MealOptimizer {
             const categoryFoods  = foodsWithCosts.filter(f => f.food.category === category);
             const validCombos    = [];
 
-            // ── 1. Single items ──
+            // Helper: estimate serving weight in grams from macronutrients
+            // Macros account for ~30-40% of total food weight; the rest is water/fiber
+            const estimateGrams = (food, portions) => {
+                const macroGrams = (food.protein || 0) + (food.carbs || 0) + (food.fats || 0);
+                // For most Indian foods, macros are ~30-40% of weight. Use 2.8x multiplier.
+                return Math.round(macroGrams * 2.8 * portions);
+            };
+
+            // Helper: check if a food is premium (for LOW budget filtering)
+            const isPremium = (name) => {
+                const n = name.toLowerCase();
+                return n.includes('fish') || n.includes('mutton') || n.includes('almond') || n.includes('bar');
+            };
+
+            // Helper: prevent repeating the same base dish in a combo
+            const hasDuplicateBaseDish = (entries) => {
+                const baseGroups = [
+                    ['idli'], ['poha', 'pohe'], ['dosa', 'dosai'], ['rice', 'chawal', 'pulao', 'khichdi'], 
+                    ['roti', 'chapati', 'phulka', 'paratha', 'bhakri', 'puri', 'naan'], 
+                    ['dal', 'amti', 'varan'], ['paneer'], ['chicken', 'murgh'], ['upma'], ['oats'], 
+                    ['salad'], ['sandwich', 'burger', 'wrap', 'roll'], ['chole', 'rajma', 'usali', 'matki', 'chana'], 
+                    ['sabzi', 'curry', 'bhaji'], ['pasta', 'noodles', 'maggi'], ['pizza'], 
+                    ['soup'], ['smoothie', 'shake', 'juice'], ['tea', 'coffee', 'chai']
+                ];
+                
+                const names = entries.map(e => e.resolved.food.name.toLowerCase());
+                
+                for (const group of baseGroups) {
+                    const count = names.filter(n => group.some(syn => n.includes(syn))).length;
+                    if (count >= 2) return true; // Found 2 or more foods with the same base dish group
+                }
+                
+                return false;
+            };
+
+            // Helper: build a scored combo from an array of {resolved, portions} entries
+            // Each item is a distinct food with its own whole-number portion count
+            const buildCombo = (entries, rawItems) => {
+                if (entries.length > 1 && hasDuplicateBaseDish(entries)) return null;
+
+                // entries = [{ resolved, portions }, ...]
+                const totalCals    = entries.reduce((s, e) => s + e.resolved.calories * e.portions, 0);
+                const totalCost    = entries.reduce((s, e) => s + e.resolved.calculatedCost * e.portions, 0);
+                const totalProtein = entries.reduce((s, e) => s + e.resolved.protein * e.portions, 0);
+
+                if (Math.abs(totalCals - targetCal) > targetCal * CALORIE_TOLERANCE) return null;
+
+                if (category === 'Breakfast') {
+                    const totalEggPortions = entries.reduce((sum, e) => {
+                        const name = e.resolved.food.name.toLowerCase();
+                        return (name.includes('egg') || name.includes('anda')) ? sum + e.portions : sum;
+                    }, 0);
+                    if (totalEggPortions > 2) return null;
+                }
+
+                const affordabilityScore = totalCost <= categoryBudget ? 100 : Math.max(0, Math.round(100 - ((totalCost - categoryBudget) / categoryBudget) * 100));
+
+                const totalPortions = entries.reduce((s, e) => s + e.portions, 0);
+                const studentFriendly = entries.every(e => e.resolved.food.studentFriendly) &&
+                    totalCost <= STUDENT_FRIENDLY_COST_PER_ITEM * totalPortions;
+
+                const substitutions = entries
+                    .filter(e => e.resolved.substitution)
+                    .map(e => e.resolved.substitution);
+
+                const combo = {
+                    foods: entries.map(e => ({
+                        food: e.resolved.food,
+                        portions: e.portions,
+                        servingGrams: estimateGrams(e.resolved.food, e.portions)
+                    })),
+                    totalCalories:     Math.round(totalCals),
+                    totalCost:         Math.round(totalCost * 100) / 100,
+                    totalProtein:      Math.round(totalProtein),
+                    affordabilityScore,
+                    studentFriendly,
+                    swaps: entries.flatMap(e => this.getIngredientSwaps(e.resolved.food)),
+                    priceAlerts:   this._comboAlerts(rawItems, spikeMap),
+                    substitutions,
+                    isSubstituted: substitutions.length > 0
+                };
+
+                combo.mealQualityScore = calculateMealQualityScore(combo, budgetLevel, user.dietType);
+
+                const calDiff = Math.abs(combo.totalCalories - targetCal);
+                const calFitScore = Math.max(0, 100 - (calDiff / targetCal) * 100);
+                combo.finalScore = Math.round(calFitScore * 0.4 + combo.mealQualityScore * 0.3 + combo.affordabilityScore * 0.3);
+
+                // LOW budget filter: reject premium items, and enforce a strict cost ceiling
+                if (budgetLevel === 'LOW') {
+                    if (entries.some(e => isPremium(e.resolved.food.name))) return null;
+                    // Strict ceiling: do not allow a combo to cost more than 1.5x the category budget
+                    if (totalCost > categoryBudget * 1.5) return null;
+                }
+
+                return combo;
+            };
+
+            // ── 1. Single items (with portion scaling) ──
             for (const item of categoryFoods) {
                 if (item.calories <= 0) continue;
-
                 const resolved = this._resolveItem(item, substituteLookup);
-
-                const optimalPortions = Math.max(
-                    1,
-                    Math.round((targetCal / resolved.calories) * 10) / 10
-                );
-                const adjustedCals = resolved.calories * optimalPortions;
-
-                if (Math.abs(adjustedCals - targetCal) <= targetCal * CALORIE_TOLERANCE) {
-                    const adjustedCost       = resolved.calculatedCost * optimalPortions;
-                    const affordabilityScore = adjustedCost <= categoryBudget ? 100 : Math.max(0, Math.round(100 - ((adjustedCost - categoryBudget) / categoryBudget) * 100));
-                    
-                    const studentFriendly    =
-                        resolved.food.studentFriendly &&
-                        adjustedCost <= STUDENT_FRIENDLY_COST_PER_ITEM * optimalPortions;
-
-                    const combo = {
-                        foods:             [{ food: resolved.food, portions: optimalPortions }],
-                        totalCalories:     Math.round(adjustedCals),
-                        totalCost:         Math.round(adjustedCost * 100) / 100,
-                        totalProtein:      Math.round(resolved.protein * optimalPortions),
-                        affordabilityScore,
-                        studentFriendly,
-                        swaps:             this.getIngredientSwaps(resolved.food),
-                        priceAlerts:       this._comboAlerts([item], spikeMap),
-                        substitutions:     resolved.substitution ? [resolved.substitution] : [],
-                        isSubstituted:     !!resolved.substitution
-                    };
-
-                    combo.mealQualityScore = calculateMealQualityScore(combo, budgetLevel, user.dietType);
-                    
-                    // Calorie Fit Score (0-100)
-                    const calDiff = Math.abs(combo.totalCalories - targetCal);
-                    const calFitScore = Math.max(0, 100 - (calDiff / targetCal) * 100);
-                    
-                    combo.finalScore = Math.round(calFitScore * 0.4 + combo.mealQualityScore * 0.3 + combo.affordabilityScore * 0.3);
-
-                    // Under low budget, filter out extremely premium single options
-                    if (budgetLevel === 'LOW') {
-                        const name = resolved.food.name.toLowerCase();
-                        if (name.includes('fish') || name.includes('mutton') || name.includes('almond') || name.includes('bar')) {
-                            continue;
-                        }
-                    }
-
-                    validCombos.push(combo);
-                }
+                const portions = Math.max(1, Math.round(targetCal / resolved.calories));
+                const combo = buildCombo([{ resolved, portions }], [item]);
+                if (combo) validCombos.push(combo);
             }
 
-            // ── 2. Double combinations ──
-            const affordableCategoryFoods = [...categoryFoods]
+            // ── 2. Double combinations (2 distinct items, portions scaled) ──
+            const sortedCategoryFoods = [...categoryFoods]
                 .sort((a, b) => a.calculatedCost - b.calculatedCost)
-                .slice(0, 50);
+                .slice(0, 60);
 
-            for (let i = 0; i < affordableCategoryFoods.length; i++) {
-                for (let j = i + 1; j < affordableCategoryFoods.length; j++) {
-                    const rawA = affordableCategoryFoods[i];
-                    const rawB = affordableCategoryFoods[j];
+            for (let i = 0; i < sortedCategoryFoods.length; i++) {
+                for (let j = i + 1; j < sortedCategoryFoods.length; j++) {
+                    const rawA = sortedCategoryFoods[i];
+                    const rawB = sortedCategoryFoods[j];
                     if (rawA.calories <= 0 || rawB.calories <= 0) continue;
 
                     const itemA = this._resolveItem(rawA, substituteLookup);
                     const itemB = this._resolveItem(rawB, substituteLookup);
 
-                    const portA = Math.max(0.5, Math.round((targetCal * 0.6 / itemA.calories) * 10) / 10);
-                    const portB = Math.max(0.5, Math.round((targetCal * 0.4 / itemB.calories) * 10) / 10);
+                    // Primary item gets 60% of calories, secondary gets 40%
+                    const portA = Math.max(1, Math.round(targetCal * 0.6 / itemA.calories));
+                    const portB = Math.max(1, Math.round(targetCal * 0.4 / itemB.calories));
 
-                    const combinedCals    = (itemA.calories * portA) + (itemB.calories * portB);
-                    const combinedCost    = (itemA.calculatedCost * portA) + (itemB.calculatedCost * portB);
-                    const combinedProtein = (itemA.protein * portA) + (itemB.protein * portB);
+                    const combo = buildCombo(
+                        [{ resolved: itemA, portions: portA }, { resolved: itemB, portions: portB }],
+                        [rawA, rawB]
+                    );
+                    if (combo) validCombos.push(combo);
+                }
+            }
 
-                    if (Math.abs(combinedCals - targetCal) <= targetCal * CALORIE_TOLERANCE) {
-                        const affordabilityScore = combinedCost <= categoryBudget ? 100 : Math.max(0, Math.round(100 - ((combinedCost - categoryBudget) / categoryBudget) * 100));
-                        
-                        const studentFriendly    =
-                            itemA.food.studentFriendly &&
-                            itemB.food.studentFriendly &&
-                            combinedCost <= STUDENT_FRIENDLY_COST_PER_ITEM * (portA + portB);
+            // ── 3. Triple combinations (3 distinct items, portions scaled) ──
+            // Sort by lowest cost to prioritize budget-friendly combinations
+            const tripleCandidates = [...categoryFoods]
+                .sort((a, b) => a.calculatedCost - b.calculatedCost)
+                .slice(0, 30);
 
-                        const substitutions = [
-                            ...(itemA.substitution ? [itemA.substitution] : []),
-                            ...(itemB.substitution ? [itemB.substitution] : [])
-                        ];
+            for (let i = 0; i < tripleCandidates.length; i++) {
+                for (let j = i + 1; j < tripleCandidates.length; j++) {
+                    for (let k = j + 1; k < tripleCandidates.length; k++) {
+                        const rawA = tripleCandidates[i];
+                        const rawB = tripleCandidates[j];
+                        const rawC = tripleCandidates[k];
+                        if (rawA.calories <= 0 || rawB.calories <= 0 || rawC.calories <= 0) continue;
 
-                        const combo = {
-                            foods: [
-                                { food: itemA.food, portions: portA },
-                                { food: itemB.food, portions: portB }
-                            ],
-                            totalCalories:     Math.round(combinedCals),
-                            totalCost:         Math.round(combinedCost * 100) / 100,
-                            totalProtein:      Math.round(combinedProtein),
-                            affordabilityScore,
-                            studentFriendly,
-                            swaps: [
-                                ...this.getIngredientSwaps(itemA.food),
-                                ...this.getIngredientSwaps(itemB.food)
-                            ],
-                            priceAlerts:   this._comboAlerts([rawA, rawB], spikeMap),
-                            substitutions,
-                            isSubstituted: substitutions.length > 0
-                        };
+                        const itemA = this._resolveItem(rawA, substituteLookup);
+                        const itemB = this._resolveItem(rawB, substituteLookup);
+                        const itemC = this._resolveItem(rawC, substituteLookup);
 
-                        combo.mealQualityScore = calculateMealQualityScore(combo, budgetLevel, user.dietType);
-                        
-                        const calDiff = Math.abs(combo.totalCalories - targetCal);
-                        const calFitScore = Math.max(0, 100 - (calDiff / targetCal) * 100);
-                        
-                        combo.finalScore = Math.round(calFitScore * 0.4 + combo.mealQualityScore * 0.3 + combo.affordabilityScore * 0.3);
+                        // Split calories: 40% / 35% / 25%
+                        const portA = Math.max(1, Math.round(targetCal * 0.40 / itemA.calories));
+                        const portB = Math.max(1, Math.round(targetCal * 0.35 / itemB.calories));
+                        const portC = Math.max(1, Math.round(targetCal * 0.25 / itemC.calories));
 
-                        // Under low budget, filter out extremely premium combinations
-                        if (budgetLevel === 'LOW') {
-                            const nameA = itemA.food.name.toLowerCase();
-                            const nameB = itemB.food.name.toLowerCase();
-                            if (nameA.includes('mutton') || nameB.includes('mutton') || nameA.includes('fish') || nameB.includes('fish') || (nameA.includes('almond') && nameB.includes('almond'))) {
-                                continue;
-                            }
-                        }
-
-                        validCombos.push(combo);
+                        const combo = buildCombo(
+                            [{ resolved: itemA, portions: portA }, { resolved: itemB, portions: portB }, { resolved: itemC, portions: portC }],
+                            [rawA, rawB, rawC]
+                        );
+                        if (combo) validCombos.push(combo);
                     }
                 }
             }
 
             // ── Sorting strategy per mode ──
+            const getBaseDishes = (combo) => {
+                const baseGroups = [
+                    ['idli'], ['poha', 'pohe'], ['dosa', 'dosai'], ['rice', 'chawal', 'pulao', 'khichdi'], 
+                    ['roti', 'chapati', 'phulka', 'paratha', 'bhakri', 'puri', 'naan'], 
+                    ['dal', 'amti', 'varan'], ['paneer'], ['chicken', 'murgh'], ['upma'], ['oats'], 
+                    ['salad'], ['sandwich', 'burger', 'wrap', 'roll'], ['chole', 'rajma', 'usali', 'matki', 'chana'], 
+                    ['sabzi', 'curry', 'bhaji'], ['pasta', 'noodles', 'maggi'], ['pizza'], 
+                    ['soup'], ['smoothie', 'shake', 'juice'], ['tea', 'coffee', 'chai']
+                ];
+                const bases = new Set();
+                const names = combo.foods.map(f => f.food.name.toLowerCase());
+                for (const name of names) {
+                    for (let i = 0; i < baseGroups.length; i++) {
+                        if (baseGroups[i].some(syn => name.includes(syn))) {
+                            bases.add(i); // Add the index of the group
+                        }
+                    }
+                }
+                return bases;
+            };
+
+            const selectDiverseCombos = (combosList, maxCount) => {
+                const selected = [];
+                for (const combo of combosList) {
+                    if (selected.length >= maxCount) break;
+                    
+                    const comboFoodIds = new Set(combo.foods.map(f => f.food._id.toString()));
+                    const comboBases = getBaseDishes(combo);
+                    
+                    let hasOverlap = false;
+                    for (const sel of selected) {
+                        const selFoodIds = new Set(sel.foods.map(f => f.food._id.toString()));
+                        for (const id of comboFoodIds) {
+                            if (selFoodIds.has(id)) { hasOverlap = true; break; }
+                        }
+                        if (hasOverlap) break;
+                        
+                        const selBases = getBaseDishes(sel);
+                        for (const b of comboBases) {
+                            if (selBases.has(b)) { hasOverlap = true; break; }
+                        }
+                        if (hasOverlap) break;
+                    }
+                    if (!hasOverlap) selected.push(combo);
+                }
+                
+                // Fallback: if we are too strict, just add whatever doesn't share exact IDs
+                if (selected.length < maxCount) {
+                    for (const combo of combosList) {
+                        if (selected.length >= maxCount) break;
+                        if (selected.includes(combo)) continue;
+                        
+                        const comboFoodIds = new Set(combo.foods.map(f => f.food._id.toString()));
+                        let idOverlap = false;
+                        for (const sel of selected) {
+                            const selFoodIds = new Set(sel.foods.map(f => f.food._id.toString()));
+                            for (const id of comboFoodIds) {
+                                if (selFoodIds.has(id)) { idOverlap = true; break; }
+                            }
+                            if (idOverlap) break;
+                        }
+                        if (!idOverlap) selected.push(combo);
+                    }
+                }
+                
+                // Absolute Fallback
+                if (selected.length < maxCount) {
+                    for (const combo of combosList) {
+                        if (selected.length >= maxCount) break;
+                        if (!selected.includes(combo)) selected.push(combo);
+                    }
+                }
+                return selected;
+            };
+
             if (mode === 'student') {
-                result[category] = validCombos
+                const sorted = validCombos
                     .filter(c => c.studentFriendly)
-                    .sort((a, b) => b.finalScore - a.finalScore)
-                    .slice(0, 5);
+                    .sort((a, b) => b.finalScore - a.finalScore);
+                result[category] = selectDiverseCombos(sorted, 5);
             } else if (mode === 'budget_challenge') {
-                // In challenge mode, we sort categories by cost to find cheapest daily plans
-                result[category] = validCombos
-                    .sort((a, b) => a.totalCost - b.totalCost)
-                    .slice(0, 8); // larger pool to combine
+                const sorted = validCombos
+                    .sort((a, b) => a.totalCost - b.totalCost);
+                result[category] = selectDiverseCombos(sorted, 8);
             } else {
-                // Balanced mode sorts by composite score
-                result[category] = validCombos
-                    .sort((a, b) => b.finalScore - a.finalScore)
-                    .slice(0, 5);
+                const sorted = validCombos
+                    .sort((a, b) => b.finalScore - a.finalScore);
+                result[category] = selectDiverseCombos(sorted, 5);
             }
         }
 
@@ -730,9 +841,72 @@ class MealOptimizer {
             }
         }
 
-        return dailyPlans
-            .sort((a, b) => b.dailyRankScore - a.dailyRankScore)
-            .slice(0, 5);
+        const sortedPlans = dailyPlans.sort((a, b) => b.dailyRankScore - a.dailyRankScore);
+        const selectedPlans = [];
+
+        const getFoodIds = (plan) => {
+            const ids = new Set();
+            for (const combo of Object.values(plan.meals)) {
+                combo.foods.forEach(f => ids.add(f.food._id.toString()));
+            }
+            return ids;
+        };
+
+        const getPlanDietType = (plan) => {
+            let hasNonVeg = false;
+            let hasVeg = false;
+            for (const combo of Object.values(plan.meals)) {
+                combo.foods.forEach(f => {
+                    if (f.food.type === 'non-vegetarian') hasNonVeg = true;
+                    else if (f.food.type === 'vegetarian') hasVeg = true;
+                });
+            }
+            if (hasNonVeg) return 'non-vegetarian';
+            if (hasVeg) return 'vegetarian';
+            return 'vegan';
+        };
+
+        const usedDietTypes = new Set();
+
+        for (const plan of sortedPlans) {
+            if (selectedPlans.length >= 5) break;
+
+            const planFoodIds = getFoodIds(plan);
+            const planDietType = getPlanDietType(plan);
+
+            // 1. Check for overlapping food items with already selected plans
+            let hasOverlap = false;
+            for (const selected of selectedPlans) {
+                const selectedFoodIds = getFoodIds(selected);
+                for (const id of planFoodIds) {
+                    if (selectedFoodIds.has(id)) {
+                        hasOverlap = true;
+                        break;
+                    }
+                }
+                if (hasOverlap) break;
+            }
+
+            // 2. Try to diversify diet types (if we already have this diet type, we skip it UNLESS we are desperate)
+            // But we prioritize non-overlap first. If it's non-overlapping, it's good, but let's give a slight preference to new diet types.
+            if (!hasOverlap) {
+                selectedPlans.push(plan);
+                usedDietTypes.add(planDietType);
+            }
+        }
+
+        // Fallback: If we couldn't find 5 completely non-overlapping plans, relax the overlap constraint
+        // but still try to avoid EXACT duplicates.
+        if (selectedPlans.length < 5) {
+            for (const plan of sortedPlans) {
+                if (selectedPlans.length >= 5) break;
+                if (!selectedPlans.includes(plan)) {
+                    selectedPlans.push(plan);
+                }
+            }
+        }
+
+        return selectedPlans;
     }
 }
 

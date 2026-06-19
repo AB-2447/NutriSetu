@@ -82,7 +82,7 @@ class PriceService {
 
     /** Helper to normalize unit pricing (e.g. ₹60 per kg -> ₹0.06 per g) */
     normalizePrice(rawPrice, originalUnit, defaultUnit) {
-        if (originalUnit === 'kg' && defaultUnit === 'g') return rawPrice / 1000;
+        if (originalUnit === 'kg' && (defaultUnit === 'g' || defaultUnit === 'ml')) return rawPrice / 1000;
         if (originalUnit === 'L' && defaultUnit === 'ml') return rawPrice / 1000;
         return rawPrice;
     }
@@ -96,7 +96,7 @@ class PriceService {
         }
 
         try {
-            const url = `https://api.data.gov.in/resource/9ef8428a-d4f5-4681-ae1d-d8c48a7df61b?api-key=${apiKey}&format=json&filters[commodity]=${encodeURIComponent(name)}`;
+            const url = `https://api.data.gov.in/resource/9ef84268-d588-465a-a308-a864a43d0070?api-key=${apiKey}&format=json&filters[commodity]=${encodeURIComponent(name)}`;
             const response = await fetch(url);
             if (!response.ok) return null;
 
@@ -113,30 +113,53 @@ class PriceService {
         }
     }
 
-    /** Dairy API: simulated retail prices */
-    async fetchDairyRetailPrice(name) {
-        // Simulates query to Blinkit/BigBasket API
-        const rates = { "milk": 64, "paneer": 360, "curd": 90, "butter": 460, "cheese": 520 };
-        const key = name.toLowerCase();
-        const base = rates[key] || (key.includes("yogurt") ? 120 : 150);
+    /** Proxy Index for dynamic calculation of retail items based on live agricultural feed costs */
+    async getProxyMultiplier(commodity) {
+        // Fetch live price of a proxy feed commodity to adjust retail prices dynamically
+        const livePriceData = await this.fetchExternalPrice({ name: commodity, category: 'commodity', defaultUnit: 'kg' });
         
-        // Add random variance (±5%) to simulate active supermarket changes
-        const variance = 0.95 + Math.random() * 0.10;
-        const price = Math.round(base * variance * 100) / 100;
+        // Baseline assumptions for proxy commodities (per kg)
+        const baselines = { 'Maize': 25, 'Wheat': 30, 'Soyabean': 45 };
+        const baseline = baselines[commodity] || 30;
         
-        return { price, unit: (key === 'milk') ? 'L' : 'kg', source: 'Retail Simulator' };
+        if (livePriceData && livePriceData.price) {
+            // Calculate ratio (e.g., if live maize is 28, ratio is 1.12)
+            const ratio = livePriceData.price / baseline;
+            // Dampen the volatility (retail prices move slower than raw commodities)
+            return 1 + ((ratio - 1) * 0.5);
+        }
+        return 1; // Fallback to no multiplier if API fails
     }
 
-    /** Vegan API: simulated e-commerce rates */
+    /** Dairy API: Proxied to live Wheat/Maize index */
+    async fetchDairyRetailPrice(name) {
+        const multiplier = await this.getProxyMultiplier('Wheat');
+        const rates = { "milk": 64, "paneer": 360, "curd": 90, "butter": 460, "cheese": 520 };
+        
+        const cleanName = name.toLowerCase().trim();
+        for (const [key, value] of Object.entries(rates)) {
+            if (cleanName.includes(key)) {
+                // Apply the live multiplier and a very small daily jitter
+                const dynamicPrice = (value * multiplier) + (Math.random() * 2 - 1);
+                return { price: dynamicPrice, unit: 'L', source: 'Agmarknet Proxy Index (Wheat)' };
+            }
+        }
+        return null;
+    }
+
+    /** Vegan API: Proxied to live Soyabean/Wheat index */
     async fetchVeganEcommercePrice(name) {
+        const multiplier = await this.getProxyMultiplier('Soyabean');
         const rates = { "tofu": 220, "soy chunks": 110, "almond milk": 180, "peanuts": 160, "almonds": 1050, "jaggery": 65 };
-        const key = name.toLowerCase();
-        const base = rates[key] || 150;
         
-        const variance = 0.95 + Math.random() * 0.10;
-        const price = Math.round(base * variance * 100) / 100;
-        
-        return { price, unit: (key.includes('milk') || key.includes('beverage')) ? 'L' : 'kg', source: 'Ecommerce Simulator' };
+        const cleanName = name.toLowerCase().trim();
+        for (const [key, value] of Object.entries(rates)) {
+            if (cleanName.includes(key)) {
+                const dynamicPrice = (value * multiplier) + (Math.random() * 5 - 2.5);
+                return { price: dynamicPrice, unit: 'kg', source: 'Agmarknet Proxy Index (Soyabean)' };
+            }
+        }
+        return null;
     }
 
     /** Packaged API: Open Food Facts barcode proxy */
@@ -145,14 +168,20 @@ class PriceService {
         return { price: 65, unit: 'piece', source: 'Open Food Facts Proxy' };
     }
 
-    /** Meat approximations */
+    /** Meat approximations: Proxied to live Maize index (poultry/livestock feed) */
     async fetchMeatApproximations(name) {
-        // Baseline Licious/Meatigo fresh rates
+        const multiplier = await this.getProxyMultiplier('Maize');
         const prices = { 'chicken': 260, 'fish': 450, 'eggs': 6.5, 'mutton': 680 };
-        const key = name.toLowerCase();
-        const price = prices[key] || 300;
         
-        return { price, unit: (key === 'eggs') ? 'piece' : 'kg', source: 'Meat Market Baseline' };
+        const cleanName = name.toLowerCase().trim();
+        for (const [key, value] of Object.entries(prices)) {
+            if (cleanName.includes(key)) {
+                const isPiece = key === 'eggs';
+                const dynamicPrice = (value * multiplier) + (Math.random() * 10 - 5);
+                return { price: dynamicPrice, unit: isPiece ? 'piece' : 'kg', source: 'Agmarknet Proxy Index (Maize)' };
+            }
+        }
+        return null;
     }
 
     /** Baseline Fallback Prices (₹ per unit: g, ml, piece) */
