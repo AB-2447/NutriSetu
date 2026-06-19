@@ -387,12 +387,10 @@
                         </div>
                         <div id="add-food-form">
                             <div class="field-group"><label for="log-food-select">Search Foods</label><select id="log-food-select"></select></div>
-                            <div class="field-group">
-                                <label for="log-portions">Portions</label>
-                                <div class="portion-control">
-                                    <button type="button" class="portion-btn" onclick="adjustPortion(-1)">−</button>
-                                    <input type="number" id="log-portions" value="1" min="1" step="1">
-                                    <button type="button" class="portion-btn" onclick="adjustPortion(1)">+</button>
+                            <div class="form-group">
+                                <label for="log-grams">Weight (Grams)</label>
+                                <div class="input-wrapper">
+                                    <input type="number" id="log-grams" value="100" min="10" step="10">
                                 </div>
                             </div>
                             <div id="food-preview" class="food-preview hidden"></div>

@@ -5,7 +5,7 @@ const logSchema = new mongoose.Schema({
     foodId:   { type: mongoose.Schema.Types.ObjectId, ref: 'Food' },
     foodName: { type: String, required: true },
     calories: { type: Number, required: true },
-    portions: { type: Number, required: true, min: 0.5 },
+    grams:    { type: Number, required: true, min: 1 },
     cost:     { type: Number, required: true, default: 0 }, // dynamically calculated at time of log
     type:     { type: String },
     date:     { type: Date, default: Date.now, index: true }

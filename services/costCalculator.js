@@ -16,7 +16,12 @@ class CostCalculator {
                 const normalizedPrice = await priceService.getIngredientPrice(ing.name, ing.category || 'commodity');
                 totalCost += ing.qty * normalizedPrice;
             }
-            return Math.round(totalCost * 100) / 100;
+            
+            // Add a standard restaurant/retail markup (3.5x multiplier)
+            // Raw ingredient cost usually makes up ~25-30% of the final food price
+            const retailPrice = totalCost * 3.5;
+            
+            return Math.round(retailPrice * 100) / 100;
         } catch (error) {
             console.error(`Error calculating food cost for ${food.name}:`, error.message);
             return food.cost || 0;

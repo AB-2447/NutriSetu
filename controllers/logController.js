@@ -45,33 +45,35 @@ async function syncBudgetHistory(userId) {
 
 exports.logFood = async (req, res) => {
     try {
-        const { foodId, foodName, calories, portions } = req.body;
-        if (!foodName || calories === undefined || portions === undefined) {
-            return res.status(400).json({ error: 'Missing required log fields: foodName, calories, portions' });
+        const { foodId, foodName, calories, grams } = req.body;
+        if (!foodName || calories === undefined || grams === undefined) {
+            return res.status(400).json({ error: 'Missing required log fields: foodName, calories, grams' });
         }
-        if (typeof portions !== 'number' || portions <= 0) {
-            return res.status(400).json({ error: 'Portions must be a positive number' });
+        if (typeof grams !== 'number' || grams <= 0) {
+            return res.status(400).json({ error: 'Grams must be a positive number' });
         }
 
         // Calculate cost dynamically
         let unitCost = 0;
+        let type = req.body.type;
         if (foodId) {
             const food = await Food.findById(foodId);
             if (food) {
+                type = food.type;
                 unitCost = await costCalculator.calculateFoodCost(food);
             }
         }
         
-        const cost = Math.round(unitCost * portions * 100) / 100;
+        const cost = Math.round(unitCost * (grams / 100) * 100) / 100;
 
         const newLog = new Log({
             userId: req.user.id,
             foodId,
             foodName,
             calories,
-            portions,
+            grams,
             cost,
-            type: req.body.type,
+            type,
             date: new Date()
         });
 

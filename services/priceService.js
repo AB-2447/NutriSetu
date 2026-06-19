@@ -18,8 +18,8 @@ class PriceService {
             });
             
             if (!ingredient) {
-                // If not found in our catalog, log it and return generic fallback
-                console.warn(`Ingredient not found in catalog: ${name}, using fallback.`);
+                // If not found in our catalog, use fallback silently to avoid console flooding
+                // console.warn(`Ingredient not found in catalog: ${name}, using fallback.`);
                 return this.getFallbackPriceValue(name, category);
             }
 

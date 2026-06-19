@@ -309,7 +309,7 @@ function calculateMealQualityScore(combo, budgetLevel, dietType) {
                 }
             }
             
-            const proteinInFood = f.food.protein * f.portions;
+            const proteinInFood = f.food.protein * (f.grams / 100);
             weightedProteinSum += proteinInFood * pq;
         });
         
@@ -318,7 +318,7 @@ function calculateMealQualityScore(combo, budgetLevel, dietType) {
     
     // 2. Micronutrient Density Score (max 30 points)
     let weightedMicroSum = 0;
-    let totalPortionsForMicro = 0;
+    let totalGramsForMicro = 0;
     
     combo.foods.forEach(f => {
         const name = f.food.name.toLowerCase();
@@ -330,11 +330,11 @@ function calculateMealQualityScore(combo, budgetLevel, dietType) {
             density = 0.7;
         }
         
-        weightedMicroSum += density * f.portions;
-        totalPortionsForMicro += f.portions;
+        weightedMicroSum += density * f.grams;
+        totalGramsForMicro += f.grams;
     });
     
-    let microDensityScore = totalPortionsForMicro > 0 ? (weightedMicroSum / totalPortionsForMicro) * 30 : 0;
+    let microDensityScore = totalGramsForMicro > 0 ? (weightedMicroSum / totalGramsForMicro) * 30 : 0;
     
     // 3. Food Diversity Score (max 20 points)
     let uniqueFoodsCount = combo.foods.length;
@@ -347,7 +347,7 @@ function calculateMealQualityScore(combo, budgetLevel, dietType) {
     
     // 4. Processing Level Score (max 10 points)
     let weightedProcessingSum = 0;
-    let totalPortionsForProc = 0;
+    let totalGramsForProc = 0;
     combo.foods.forEach(f => {
         const name = f.food.name.toLowerCase();
         let proc = 0.7; // default moderately processed
@@ -358,10 +358,10 @@ function calculateMealQualityScore(combo, budgetLevel, dietType) {
             proc = 0.3; // highly processed
         }
         
-        weightedProcessingSum += proc * f.portions;
-        totalPortionsForProc += f.portions;
+        weightedProcessingSum += proc * f.grams;
+        totalGramsForProc += f.grams;
     });
-    let processingLevelScore = totalPortionsForProc > 0 ? (weightedProcessingSum / totalPortionsForProc) * 10 : 0;
+    let processingLevelScore = totalGramsForProc > 0 ? (weightedProcessingSum / totalGramsForProc) * 10 : 0;
     
     // 5. Budget Alignment & Ingredient Quality Score (max 10 points)
     let alignmentScore = 100;
@@ -404,7 +404,17 @@ function calculateMealQualityScore(combo, budgetLevel, dietType) {
     }
     let budgetAlignmentScore = (alignmentScore / 100) * 10;
     
-    return Math.round(proteinQualityScore + microDensityScore + foodDiversityScore + processingLevelScore + budgetAlignmentScore);
+    let finalScore = Math.round(proteinQualityScore + microDensityScore + foodDiversityScore + processingLevelScore + budgetAlignmentScore);
+    
+    // Priority logic: If user is non-veg, prioritize combos that contain non-veg items
+    if (dietType === 'non-vegetarian') {
+        const hasNonVeg = combo.foods.some(f => f.food.type === 'non-vegetarian');
+        if (hasNonVeg) {
+            finalScore += 30; // High priority bump
+        }
+    }
+    
+    return finalScore;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -477,10 +487,10 @@ class MealOptimizer {
 
         const budgetLevel = getBudgetLevel(user.budgetTarget);
 
-        for (const [category, fraction] of Object.entries(splits)) {
-            const targetCal      = calorieTarget * fraction;
-            const categoryBudget = user.budgetTarget * fraction;
-            const categoryFoods  = foodsWithCosts.filter(f => f.food.category === category);
+        for (const category of ['Breakfast', 'Lunch', 'Dinner', 'Snacks']) {
+            const categoryFoods = foodsWithCosts.filter(f => f.food.category && f.food.category.includes(category));
+            const targetCal      = calorieTarget * splits[category];
+            const categoryBudget = user.budgetTarget * splits[category];
             const validCombos    = [];
 
             // Helper: estimate serving weight in grams from macronutrients
@@ -518,31 +528,30 @@ class MealOptimizer {
                 return false;
             };
 
-            // Helper: build a scored combo from an array of {resolved, portions} entries
-            // Each item is a distinct food with its own whole-number portion count
+            // Helper: build a scored combo from an array of {resolved, grams} entries
             const buildCombo = (entries, rawItems) => {
                 if (entries.length > 1 && hasDuplicateBaseDish(entries)) return null;
 
-                // entries = [{ resolved, portions }, ...]
-                const totalCals    = entries.reduce((s, e) => s + e.resolved.calories * e.portions, 0);
-                const totalCost    = entries.reduce((s, e) => s + e.resolved.calculatedCost * e.portions, 0);
-                const totalProtein = entries.reduce((s, e) => s + e.resolved.protein * e.portions, 0);
+                // entries = [{ resolved, grams }, ...]
+                const totalCals    = entries.reduce((s, e) => s + e.resolved.calories * (e.grams / 100), 0);
+                const totalCost    = entries.reduce((s, e) => s + e.resolved.calculatedCost * (e.grams / 100), 0);
+                const totalProtein = entries.reduce((s, e) => s + e.resolved.protein * (e.grams / 100), 0);
 
                 if (Math.abs(totalCals - targetCal) > targetCal * CALORIE_TOLERANCE) return null;
 
                 if (category === 'Breakfast') {
-                    const totalEggPortions = entries.reduce((sum, e) => {
+                    const totalEggGrams = entries.reduce((sum, e) => {
                         const name = e.resolved.food.name.toLowerCase();
-                        return (name.includes('egg') || name.includes('anda')) ? sum + e.portions : sum;
+                        return (name.includes('egg') || name.includes('anda')) ? sum + e.grams : sum;
                     }, 0);
-                    if (totalEggPortions > 2) return null;
+                    if (totalEggGrams > 200) return null; // cap at ~4 eggs
                 }
 
                 const affordabilityScore = totalCost <= categoryBudget ? 100 : Math.max(0, Math.round(100 - ((totalCost - categoryBudget) / categoryBudget) * 100));
 
-                const totalPortions = entries.reduce((s, e) => s + e.portions, 0);
+                const totalGrams = entries.reduce((s, e) => s + e.grams, 0);
                 const studentFriendly = entries.every(e => e.resolved.food.studentFriendly) &&
-                    totalCost <= STUDENT_FRIENDLY_COST_PER_ITEM * totalPortions;
+                    totalCost <= STUDENT_FRIENDLY_COST_PER_ITEM * (totalGrams / 100);
 
                 const substitutions = entries
                     .filter(e => e.resolved.substitution)
@@ -551,8 +560,7 @@ class MealOptimizer {
                 const combo = {
                     foods: entries.map(e => ({
                         food: e.resolved.food,
-                        portions: e.portions,
-                        servingGrams: estimateGrams(e.resolved.food, e.portions)
+                        grams: e.grams
                     })),
                     totalCalories:     Math.round(totalCals),
                     totalCost:         Math.round(totalCost * 100) / 100,
@@ -585,8 +593,8 @@ class MealOptimizer {
             for (const item of categoryFoods) {
                 if (item.calories <= 0) continue;
                 const resolved = this._resolveItem(item, substituteLookup);
-                const portions = Math.max(1, Math.round(targetCal / resolved.calories));
-                const combo = buildCombo([{ resolved, portions }], [item]);
+                const grams = Math.max(1, Math.round((targetCal / resolved.calories) * 100));
+                const combo = buildCombo([{ resolved, grams }], [item]);
                 if (combo) validCombos.push(combo);
             }
 
@@ -605,11 +613,11 @@ class MealOptimizer {
                     const itemB = this._resolveItem(rawB, substituteLookup);
 
                     // Primary item gets 60% of calories, secondary gets 40%
-                    const portA = Math.max(1, Math.round(targetCal * 0.6 / itemA.calories));
-                    const portB = Math.max(1, Math.round(targetCal * 0.4 / itemB.calories));
+                    const gramsA = Math.max(1, Math.round((targetCal * 0.6 / itemA.calories) * 100));
+                    const gramsB = Math.max(1, Math.round((targetCal * 0.4 / itemB.calories) * 100));
 
                     const combo = buildCombo(
-                        [{ resolved: itemA, portions: portA }, { resolved: itemB, portions: portB }],
+                        [{ resolved: itemA, grams: gramsA }, { resolved: itemB, grams: gramsB }],
                         [rawA, rawB]
                     );
                     if (combo) validCombos.push(combo);
@@ -635,12 +643,12 @@ class MealOptimizer {
                         const itemC = this._resolveItem(rawC, substituteLookup);
 
                         // Split calories: 40% / 35% / 25%
-                        const portA = Math.max(1, Math.round(targetCal * 0.40 / itemA.calories));
-                        const portB = Math.max(1, Math.round(targetCal * 0.35 / itemB.calories));
-                        const portC = Math.max(1, Math.round(targetCal * 0.25 / itemC.calories));
+                        const gramsA = Math.max(1, Math.round((targetCal * 0.40 / itemA.calories) * 100));
+                        const gramsB = Math.max(1, Math.round((targetCal * 0.35 / itemB.calories) * 100));
+                        const gramsC = Math.max(1, Math.round((targetCal * 0.25 / itemC.calories) * 100));
 
                         const combo = buildCombo(
-                            [{ resolved: itemA, portions: portA }, { resolved: itemB, portions: portB }, { resolved: itemC, portions: portC }],
+                            [{ resolved: itemA, grams: gramsA }, { resolved: itemB, grams: gramsB }, { resolved: itemC, grams: gramsC }],
                             [rawA, rawB, rawC]
                         );
                         if (combo) validCombos.push(combo);

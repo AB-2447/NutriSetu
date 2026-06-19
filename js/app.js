@@ -628,8 +628,8 @@ async function renderMealRecommendations() {
 
                 const foodItemsHTML = combo.foods.map(item => `
                     <div class="combo-sub-food">
-                        <span>${item.food.name} <small style="color:#888;">(~${item.servingGrams || Math.round(((item.food.protein||0)+(item.food.carbs||0)+(item.food.fats||0))*2.8)}g)</small></span>
-                        <span>${(item.food.calories * item.portions).toFixed(2)} kcal · P: ${(item.food.protein * item.portions).toFixed(1)}g</span>
+                        <span>${item.food.name} <small style="color:#888;">(${item.grams}g)</small></span>
+                        <span>${(item.food.calories * (item.grams / 100)).toFixed(2)} kcal</span>
                     </div>
                 `).join('');
 
@@ -705,7 +705,7 @@ function renderBudgetChallengeRecommendations(plans) {
 
     listEl.innerHTML = plans.map((plan, idx) => {
         const mealsHTML = Object.entries(plan.meals).map(([catName, combo]) => {
-            const foodNames = combo.foods.map(f => `${f.food.name} (~${f.servingGrams || Math.round(((f.food.protein||0)+(f.food.carbs||0)+(f.food.fats||0))*2.8)}g)`).join(' + ');
+            const foodNames = combo.foods.map(f => `${f.food.name} (${f.grams}g)`).join(' + ');
             return `
                 <div class="challenge-meal-row">
                     <span class="challenge-cat">${catName}:</span>
@@ -750,8 +750,8 @@ async function logBudgetChallengeDay(idx) {
                     body: JSON.stringify({
                         foodId: item.food._id,
                         foodName: item.food.name,
-                        calories: item.food.calories * item.portions,
-                        portions: Math.round(item.portions),
+                        calories: item.food.calories * (item.grams / 100),
+                        grams: Math.round(item.grams),
                         type: item.food.type
                     })
                 });
@@ -820,8 +820,8 @@ async function logOptimizedCombo(category, idx) {
     try {
         for (const item of combo.foods) {
             let logName = item.food.name;
-            let logCals = item.food.calories * item.portions;
-            let logProtein = item.food.protein * item.portions;
+            let logCals = item.food.calories * (item.grams / 100);
+            let logProtein = item.food.protein * (item.grams / 100);
 
             if (swap && item.food.name.toLowerCase().includes(swap.original.toLowerCase())) {
                 logName = logName.replace(new RegExp(swap.original, 'gi'), swap.replacement);
@@ -834,7 +834,7 @@ async function logOptimizedCombo(category, idx) {
                     foodId: item.food._id,
                     foodName: logName,
                     calories: logCals,
-                    portions: Math.round(item.portions),
+                    grams: Math.round(item.grams),
                     type: item.food.type
                 })
             });
@@ -898,38 +898,32 @@ function updateFoodPreview() {
     if (!sel || !preview || !sel.options[sel.selectedIndex]) return;
     const opt      = sel.options[sel.selectedIndex];
     if (!opt.dataset.cal) { preview.classList.add('hidden'); return; }
-    const portions = parseInt(document.getElementById('log-portions').value, 10) || 1;
-    const cal      = (parseFloat(opt.dataset.cal) * portions).toFixed(2);
-    const protein  = (parseFloat(opt.dataset.protein || 0) * portions).toFixed(1);
-    const carbs    = (parseFloat(opt.dataset.carbs || 0) * portions).toFixed(1);
-    const fats     = (parseFloat(opt.dataset.fats || 0) * portions).toFixed(1);
+    const grams = parseInt(document.getElementById('log-grams').value, 10) || 100;
+    const cal      = (parseFloat(opt.dataset.cal) * (grams / 100)).toFixed(2);
+    const protein  = (parseFloat(opt.dataset.protein || 0) * (grams / 100)).toFixed(1);
+    const carbs    = (parseFloat(opt.dataset.carbs || 0) * (grams / 100)).toFixed(1);
+    const fats     = (parseFloat(opt.dataset.fats || 0) * (grams / 100)).toFixed(1);
     preview.classList.remove('hidden');
-    preview.innerHTML = `<strong>${opt.dataset.name}</strong> × ${portions}
+    preview.innerHTML = `<strong>${opt.dataset.name}</strong> (${grams}g)
         <br><span style="color:var(--green-mid);font-weight:700">${cal} kcal</span>
         &nbsp;·&nbsp; P: ${protein}g &nbsp;·&nbsp; C: ${carbs}g &nbsp;·&nbsp; F: ${fats}g`;
 }
 
-function adjustPortion(delta) {
-    const input = document.getElementById('log-portions');
-    input.value = Math.max(1, (parseInt(input.value, 10) || 1) + delta);
-    updateFoodPreview();
-}
-
-document.addEventListener('change', e => { if (e.target.id === 'log-portions') updateFoodPreview(); });
+document.addEventListener('change', e => { if (e.target.id === 'log-grams') updateFoodPreview(); });
 
 async function logFood() {
     const sel      = document.getElementById('log-food-select');
-    const portions = parseInt(document.getElementById('log-portions').value, 10) || 1;
+    const grams = parseInt(document.getElementById('log-grams').value, 10) || 100;
     if (!sel || !sel.options[sel.selectedIndex] || !sel.options[sel.selectedIndex].dataset.cal)
         return showToast('Please select a food item.');
 
     const opt      = sel.options[sel.selectedIndex];
-    const calories = parseFloat((parseFloat(opt.dataset.cal) * portions).toFixed(2));
+    const calories = parseFloat((parseFloat(opt.dataset.cal) * (grams / 100)).toFixed(2));
 
     try {
         const res = await fetchAPI('/logs', {
             method: 'POST',
-            body: JSON.stringify({ foodId: sel.value, foodName: opt.dataset.name, calories, portions, type: opt.dataset.type })
+            body: JSON.stringify({ foodId: sel.value, foodName: opt.dataset.name, calories, grams, type: opt.dataset.type })
         });
         if (!res.ok) return showToast((await res.json()).error || 'Error logging food.', 'error');
         todayLogs.push(await res.json());
@@ -965,7 +959,7 @@ function renderLogList() {
         <li class="log-entry">
             <div class="log-entry-info">
                 <div class="log-entry-name">${log.foodName}</div>
-                <div class="log-entry-meta">×${log.portions} portion${log.portions !== 1 ? 's' : ''}</div>
+                <div class="log-entry-meta">${log.grams}g</div>
             </div>
             <span class="log-entry-cal">${parseFloat(log.calories).toFixed(2)} kcal · ₹${Math.round(log.cost || 0)}</span>
             <button class="log-del-btn" onclick="deleteLog('${log._id}')" title="Remove">×</button>
